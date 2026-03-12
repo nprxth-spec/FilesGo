@@ -1,0 +1,598 @@
+"use client";
+
+import { useState, useCallback, useEffect } from "react";
+import { useDropzone } from "react-dropzone";
+import { useSession } from "next-auth/react";
+import {
+    Upload,
+    FileText,
+    CheckCircle2,
+    AlertCircle,
+    Loader2,
+    CloudUpload,
+    Sparkles,
+    HardDrive,
+    Sheet,
+    X,
+    ChevronDown,
+} from "lucide-react";
+
+type Stage = "idle" | "uploading" | "extracting" | "drive" | "sheets" | "done" | "error";
+
+const stages: { key: Stage; label: string; icon: any }[] = [
+    { key: "uploading", label: "Uploading", icon: CloudUpload },
+    { key: "extracting", label: "AI Extracting", icon: Sparkles },
+    { key: "drive", label: "Saving to Drive", icon: HardDrive },
+    { key: "sheets", label: "Updating Sheet", icon: Sheet },
+];
+
+const stageOrder: Stage[] = ["uploading", "extracting", "drive", "sheets", "done"];
+
+interface InvoiceResult {
+    filename: string;
+    date: string;
+    card_last_4: string;
+    amount: number;
+    currency: string;
+    driveLink: string;
+    billed_to: string;
+}
+
+export default function DashboardPage() {
+    const { data: session, update } = useSession();
+    
+    // Multi-file state
+    const [queue, setQueue] = useState<File[]>([]);
+    const [currentIndex, setCurrentIndex] = useState<number>(-1);
+    const [results, setResults] = useState<(InvoiceResult | { filename: string, error: string })[]>([]);
+    const [stage, setStage] = useState<Stage>("idle");
+
+    // Drive folder selection
+    const [driveFolderId, setDriveFolderId] = useState("");
+    const [driveFolderMode, setDriveFolderMode] = useState<"auto" | "custom">("auto");
+    const [modeInitialized, setModeInitialized] = useState(false);
+    const [modeMenuOpen, setModeMenuOpen] = useState(false);
+    const [folderError, setFolderError] = useState("");
+    const [driveFolderLabel, setDriveFolderLabel] = useState("");
+
+    const buildFolderLabel = (leafName: string) => {
+        const now = new Date();
+        const year = now.getFullYear();
+        return `SA-TEAM(广告) > FB Receipt > ${year} > ${leafName}`;
+    };
+
+    // Optional: root folder for picker start location
+    const PICKER_ROOT_FOLDER_ID = "11-naB49cPhno_HpKcTbrmYPhNz_R8oJk";
+
+    // Initialize folder ID and mode from session / API once on mount,
+    // and resolve a human-readable label for the folder if present.
+    useEffect(() => {
+        if (modeInitialized && (driveFolderId ? driveFolderLabel !== "" : true)) return;
+        const load = async () => {
+            let id = driveFolderId;
+
+            // 1) Try from session
+            if (!id) {
+                const initial = (session?.user as any)?.driveFolderId as string | undefined;
+                if (initial) {
+                    id = initial;
+                }
+            }
+
+            // 2) Fallback to API if still empty
+            if (!id) {
+                try {
+                    const res = await fetch("/api/drive-folder");
+                    const data = await res.json();
+                    if (res.ok && data?.data?.driveFolderId) {
+                        id = data.data.driveFolderId as string;
+                    }
+                } catch {
+                    // ignore
+                }
+            }
+
+            if (id && !driveFolderId) {
+                setDriveFolderId(id);
+            }
+
+            // Decide initial mode once
+            if (!modeInitialized) {
+                setDriveFolderMode(id ? "custom" : "auto");
+                setModeInitialized(true);
+            }
+
+            // If we have an id but no label yet, try to resolve its name from Drive
+            if (id && !driveFolderLabel) {
+                try {
+                    const res = await fetch(`/api/drive/folder-meta?id=${encodeURIComponent(id)}`);
+                    const data = await res.json();
+                    if (res.ok && data?.data?.name) {
+                        setDriveFolderLabel(buildFolderLabel(data.data.name as string));
+                    }
+                } catch {
+                    // ignore, we'll just fall back to showing the raw ID
+                }
+            }
+        };
+        void load();
+    }, [session, modeInitialized, driveFolderId, driveFolderLabel]);
+
+    const loadGoogleApiScript = () =>
+        new Promise<void>((resolve, reject) => {
+            if (typeof window === "undefined") return reject(new Error("Window not available"));
+
+            const onReady = () => {
+                const gapi = (window as any).gapi;
+                if (!gapi || !gapi.load) {
+                    reject(new Error("gapi not available"));
+                    return;
+                }
+                gapi.load("picker", {
+                    callback: () => {
+                        resolve();
+                    },
+                });
+            };
+
+            if ((window as any).gapi && (window as any).google && (window as any).google.picker) {
+                // Script & picker already loaded
+                resolve();
+                return;
+            }
+
+            if ((window as any).gapi) {
+                onReady();
+                return;
+            }
+
+            const existing = document.querySelector<HTMLScriptElement>("script[data-google-api='true']");
+            if (existing) {
+                existing.addEventListener("load", onReady);
+                existing.addEventListener("error", () =>
+                    reject(new Error("Failed to load Google API script"))
+                );
+                return;
+            }
+
+            const script = document.createElement("script");
+            script.src = "https://apis.google.com/js/api.js";
+            script.async = true;
+            script.defer = true;
+            script.dataset.googleApi = "true";
+            script.onload = onReady;
+            script.onerror = () => reject(new Error("Failed to load Google API script"));
+            document.body.appendChild(script);
+        });
+
+    const handleOpenDrivePicker = async () => {
+        setFolderError("");
+        try {
+            if (typeof window === "undefined") return;
+            const apiKey = process.env.NEXT_PUBLIC_GOOGLE_API_KEY;
+            let accessToken = (session as any)?.accessToken as string | undefined;
+
+            if (!apiKey) {
+                setFolderError("Missing NEXT_PUBLIC_GOOGLE_API_KEY in environment.");
+                return;
+            }
+
+            // If accessToken not on session (some environments), fetch from API
+            if (!accessToken) {
+                const res = await fetch("/api/google/access-token");
+                const data = await res.json();
+                if (!res.ok || !data?.data?.accessToken) {
+                    setFolderError(data?.error ?? "Google access token missing. Please sign in again.");
+                    return;
+                }
+                accessToken = data.data.accessToken as string;
+            }
+
+            await loadGoogleApiScript();
+
+            const googleObj = (window as any).google;
+            if (!googleObj || !googleObj.picker) {
+                setFolderError("Google Picker API not available (picker library not loaded).");
+                return;
+            }
+
+            const view = new googleObj.picker.DocsView(googleObj.picker.ViewId.FOLDERS)
+                .setIncludeFolders(true)
+                .setSelectFolderEnabled(true)
+                .setParent(PICKER_ROOT_FOLDER_ID);
+
+            const picker = new googleObj.picker.PickerBuilder()
+                .addView(view)
+                .setOAuthToken(accessToken)
+                .setDeveloperKey(apiKey)
+                .setCallback((data: any) => {
+                    if (data.action === googleObj.picker.Action.PICKED && data.docs && data.docs.length > 0) {
+                        const picked = data.docs[0];
+                        if (picked && picked.id) {
+                            setDriveFolderId(picked.id);
+                            setDriveFolderMode("custom");
+                            const leafName = picked.name || picked.id;
+                            setDriveFolderLabel(buildFolderLabel(leafName));
+
+                            // Persist selection immediately so it survives refresh
+                            (async () => {
+                                try {
+                                    const res = await fetch("/api/drive-folder", {
+                                        method: "POST",
+                                        headers: { "Content-Type": "application/json" },
+                                        body: JSON.stringify({ driveFolderId: picked.id }),
+                                    });
+                                    const data = await res.json();
+                                    if (!res.ok) {
+                                        setFolderError(data.error ?? "Failed to save folder");
+                                    } else {
+                                        await update();
+                                    }
+                                } catch (err: any) {
+                                    setFolderError(err.message ?? "Failed to save folder");
+                                }
+                            })();
+                        }
+                    }
+                })
+                .build();
+
+            picker.setVisible(true);
+        } catch (err: any) {
+            setFolderError(err.message ?? "Failed to open Google Picker.");
+        }
+    };
+
+    const processNext = useCallback(async (
+        files: File[], 
+        index: number, 
+        currentResults: (InvoiceResult | { filename: string, error: string })[]
+    ) => {
+        if (index >= files.length) {
+            setStage("done");
+            return;
+        }
+
+        const file = files[index];
+        setCurrentIndex(index);
+        setStage("uploading");
+
+        try {
+            const formData = new FormData();
+            formData.append("file", file);
+            const sheetId = (session?.user as any)?.sheetId ?? "";
+            if (sheetId) formData.append("sheetId", sheetId);
+
+            // Simulate stage animation for UX
+            setTimeout(() => setStage("extracting"), 800);
+            setTimeout(() => setStage("drive"), 2500);
+            setTimeout(() => setStage("sheets"), 4000);
+
+            const res = await fetch("/api/upload", {
+                method: "POST",
+                body: formData,
+            });
+
+            const data = await res.json();
+
+            if (!res.ok) {
+                throw new Error(data.error ?? "Processing failed");
+            }
+
+            const newResult = data.data as InvoiceResult;
+            const updatedResults = [...currentResults, newResult];
+            setResults(updatedResults);
+            
+            // Process next file after a tiny delay
+            setTimeout(() => processNext(files, index + 1, updatedResults), 1000);
+            
+        } catch (err: any) {
+            const errorResult = { filename: file.name, error: err.message ?? "An unexpected error occurred" };
+            const updatedResults = [...currentResults, errorResult];
+            setResults(updatedResults);
+            
+            // Continue with next file even if this one failed
+            setTimeout(() => processNext(files, index + 1, updatedResults), 1000);
+        }
+    }, [session]);
+
+    const onDrop = useCallback(
+        (acceptedFiles: File[]) => {
+            if (acceptedFiles.length > 0) {
+                setQueue(acceptedFiles);
+                setResults([]);
+                setCurrentIndex(-1);
+                processNext(acceptedFiles, 0, []);
+            }
+        },
+        [processNext]
+    );
+
+    const { getRootProps, getInputProps, isDragActive } = useDropzone({
+        onDrop,
+        accept: { "application/pdf": [".pdf"] },
+        // Removed maxFiles: 1 to allow multiple
+        disabled: stage !== "idle" && stage !== "done" && stage !== "error",
+    });
+
+    const resetState = () => {
+        setStage("idle");
+        setResults([]);
+        setQueue([]);
+        setCurrentIndex(-1);
+    };
+
+    const currentStageIndex = stageOrder.indexOf(stage);
+    const isProcessing = currentIndex >= 0 && currentIndex < queue.length;
+    const currentFile = isProcessing ? queue[currentIndex] : null;
+
+    return (
+        <div className="max-w-4xl mx-auto">
+            <div className="mb-8 flex items-center justify-between">
+                <div>
+                    <h1 className="text-2xl font-bold text-slate-900 mb-1">Batch Upload Invoices</h1>
+                    <p className="text-slate-500">
+                        Drop multiple Facebook Ads PDF invoices to extract and sync automatically.
+                    </p>
+                </div>
+                {(stage === "done" || results.length > 0) && (
+                    <button
+                        onClick={resetState}
+                        className="flex items-center gap-1.5 px-4 py-2 bg-white rounded-xl border border-slate-200 text-sm font-medium text-slate-600 hover:bg-slate-50 transition-colors shadow-sm cursor-pointer"
+                    >
+                        <X className="w-4 h-4" /> Clear & Upload More
+                    </button>
+                )}
+            </div>
+
+            {/* Drive folder selector */}
+            <div className="mb-6 bg-white rounded-3xl border border-slate-100 shadow-lg shadow-slate-200/60 p-5 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                <div className="flex-1 space-y-3">
+                    <p className="text-sm font-semibold text-slate-800 mb-1">Drive destination</p>
+                    <p className="text-xs text-slate-400 mb-1">
+                        Choose whether to let the app create a monthly folder automatically, or always upload into a specific folder you pick from Google Drive.
+                    </p>
+                    <div className="mt-1 relative inline-block">
+                        <button
+                            type="button"
+                            onClick={() => setModeMenuOpen((v) => !v)}
+                            className="w-full sm:w-80 px-3 py-2 rounded-xl border border-slate-200 bg-white text-xs text-slate-700 flex items-center justify-between hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent shadow-sm cursor-pointer"
+                        >
+                            <span>
+                                {driveFolderMode === "auto"
+                                    ? "Automatic folder — FB_Invoices_YYYY-MM"
+                                    : "Custom folder — use Pick from Drive"}
+                            </span>
+                            <ChevronDown className="w-3.5 h-3.5 text-slate-400" />
+                        </button>
+                        {modeMenuOpen && (
+                            <div className="absolute z-20 mt-2 w-full sm:w-80 rounded-xl border border-slate-200 bg-white shadow-lg shadow-slate-200/60 py-1 text-xs text-slate-700">
+                                <button
+                                    type="button"
+                                    onClick={async () => {
+                                        setModeMenuOpen(false);
+                                        setDriveFolderMode("auto");
+                                        setFolderError("");
+                                        try {
+                                            await fetch("/api/drive-folder", {
+                                                method: "POST",
+                                                headers: { "Content-Type": "application/json" },
+                                                body: JSON.stringify({ driveFolderId: null }),
+                                            });
+                                            setDriveFolderId("");
+                                            setDriveFolderLabel("");
+                                            await update();
+                                        } catch {
+                                            // ignore
+                                        }
+                                    }}
+                                    className={`w-full px-3 py-2 text-left hover:bg-slate-50 rounded-xl cursor-pointer ${
+                                        driveFolderMode === "auto" ? "bg-slate-50" : ""
+                                    }`}
+                                >
+                                    <span className="font-semibold">Automatic folder</span>{" "}
+                                    <span className="text-slate-500">— FB_Invoices_YYYY-MM</span>
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        setModeMenuOpen(false);
+                                        setDriveFolderMode("custom");
+                                        setFolderError("");
+                                    }}
+                                    className={`w-full px-3 py-2 text-left hover:bg-slate-50 rounded-xl cursor-pointer ${
+                                        driveFolderMode === "custom" ? "bg-slate-50" : ""
+                                    }`}
+                                >
+                                    <span className="font-semibold">Custom folder</span>{" "}
+                                    <span className="text-slate-500">— use Pick from Drive</span>
+                                </button>
+                            </div>
+                        )}
+                    </div>
+                    <div className="mt-2 space-y-1">
+                        {folderError && (
+                            <p className="text-xs text-red-600">
+                                {folderError}
+                            </p>
+                        )}
+                        <p className="text-xs text-slate-500">
+                            Current target folder:&nbsp;
+                            {driveFolderMode === "auto" ? (
+                                <span className="font-medium text-slate-700">
+                                    Automatic — <code className="px-1 rounded bg-slate-100">FB_Invoices_YYYY-MM</code>
+                                </span>
+                            ) : driveFolderId ? (
+                                <a
+                                    href={`https://drive.google.com/drive/folders/${driveFolderId}`}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="font-medium text-blue-600 hover:text-blue-800 underline"
+                                >
+                                    {driveFolderLabel || driveFolderId}
+                                </a>
+                            ) : (
+                                <span className="text-slate-400">Not set</span>
+                            )}
+                        </p>
+                    </div>
+                </div>
+                <div className="flex items-center gap-2 self-start sm:self-auto">
+                    <button
+                        type="button"
+                        onClick={handleOpenDrivePicker}
+                        className="inline-flex items-center gap-2 px-4 py-2 rounded-xl border border-slate-200 bg-white text-sm font-medium text-slate-700 hover:bg-slate-50 shadow-sm disabled:opacity-50 cursor-pointer disabled:cursor-not-allowed"
+                        disabled={driveFolderMode !== "custom"}
+                    >
+                        <HardDrive className="w-4 h-4" />
+                        Pick from Drive
+                    </button>
+                </div>
+            </div>
+
+            {/* Drop Zone */}
+            <div
+                {...getRootProps()}
+                className={`relative rounded-2xl border-2 border-dashed p-12 text-center cursor-pointer transition-all duration-200 mb-8 ${isDragActive
+                        ? "border-blue-500 bg-blue-50"
+                        : stage === "done"
+                            ? "border-green-400 bg-green-50"
+                            : "border-slate-200 bg-white hover:border-blue-300 hover:bg-blue-50/30"
+                    }`}
+            >
+                <input {...getInputProps()} />
+
+                {stage === "idle" && (
+                    <div>
+                        <div className="w-16 h-16 rounded-2xl bg-blue-50 flex items-center justify-center mx-auto mb-4 group-hover:scale-110 transition-transform">
+                            <Upload className="w-8 h-8 text-blue-500" />
+                        </div>
+                        <p className="text-lg font-semibold text-slate-700 mb-1">
+                            {isDragActive ? "Drop PDFs here…" : "Drag & drop your invoice PDFs"}
+                        </p>
+                        <p className="text-sm text-slate-400 mb-4">
+                            Select or drop multiple files at once
+                        </p>
+                        <span className="inline-block px-3 py-1 rounded-full bg-slate-100 text-xs text-slate-500">
+                            PDF only
+                        </span>
+                    </div>
+                )}
+
+                {isProcessing && currentFile && (
+                    <div>
+                        <div className="flex items-center justify-center mb-4">
+                            <div className="w-16 h-16 rounded-2xl bg-blue-50 flex items-center justify-center mx-auto relative">
+                                <FileText className="w-8 h-8 text-blue-500" />
+                                <div className="absolute -bottom-2 -right-2 w-6 h-6 rounded-full bg-blue-600 flex items-center justify-center text-white text-[10px] font-bold">
+                                    {currentIndex + 1}/{queue.length}
+                                </div>
+                            </div>
+                        </div>
+                        <p className="font-medium text-slate-700 text-sm mb-1 truncate max-w-xs mx-auto">
+                            Processing: {currentFile.name}
+                        </p>
+                        <p className="text-slate-400 text-xs mt-2 flex items-center justify-center gap-2">
+                            <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                            {stages.find(s => s.key === stage)?.label || "Working..."}
+                        </p>
+                    </div>
+                )}
+
+                {stage === "done" && (
+                    <div>
+                        <div className="w-14 h-14 rounded-full bg-green-100 flex items-center justify-center mx-auto mb-3">
+                            <CheckCircle2 className="w-7 h-7 text-green-600" />
+                        </div>
+                        <p className="font-semibold text-green-700 text-lg mb-1">Batch Complete!</p>
+                        <p className="text-slate-500 text-sm">
+                            Processed {results.length} file{results.length > 1 ? "s" : ""}
+                        </p>
+                    </div>
+                )}
+            </div>
+
+            {/* Results List */}
+            {results.length > 0 && (
+                <div className="space-y-4">
+                    <h2 className="text-lg font-bold text-slate-800">Processing Results</h2>
+                    <div className="grid grid-cols-1 gap-4">
+                        {results.map((res, idx) => {
+                            if ('error' in res) {
+                                // Error Result
+                                return (
+                                    <div key={idx} className="bg-red-50 border border-red-100 rounded-2xl p-5 flex items-start gap-4">
+                                        <div className="w-10 h-10 rounded-full bg-red-100 flex items-center justify-center shrink-0">
+                                            <AlertCircle className="w-5 h-5 text-red-600" />
+                                        </div>
+                                        <div className="flex-1 min-w-0">
+                                            <p className="text-sm font-semibold text-red-900 truncate mb-1">
+                                                {res.filename}
+                                            </p>
+                                            <p className="text-xs text-red-600">{res.error}</p>
+                                        </div>
+                                    </div>
+                                );
+                            }
+
+                            // Success Result
+                            return (
+                                <div key={idx} className="bg-white border text-left border-slate-100 rounded-2xl p-5 shadow-sm hover:border-slate-200 transition-colors">
+                                    <div className="flex flex-col sm:flex-row gap-4 justify-between items-start sm:items-center mb-4">
+                                        <div className="flex items-center gap-3 min-w-0">
+                                            <div className="w-10 h-10 rounded-full bg-green-50 flex items-center justify-center shrink-0">
+                                                <CheckCircle2 className="w-5 h-5 text-green-500" />
+                                            </div>
+                                            <div className="min-w-0 pr-4">
+                                                <p className="text-sm font-semibold text-slate-900 truncate" title={res.filename}>
+                                                    {res.filename}
+                                                </p>
+                                                <p className="text-xs text-slate-500 flex items-center gap-2 mt-0.5">
+                                                    Processed successfully
+                                                </p>
+                                            </div>
+                                        </div>
+                                        
+                                        {res.driveLink && (
+                                            <a
+                                                href={res.driveLink}
+                                                target="_blank"
+                                                rel="noopener noreferrer"
+                                                className="shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-blue-100 bg-blue-50 text-blue-600 text-xs font-semibold hover:bg-blue-100 transition-colors"
+                                            >
+                                                <HardDrive className="w-3.5 h-3.5" /> Drive
+                                            </a>
+                                        )}
+                                    </div>
+                                    
+                                    <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
+                                        <div className="bg-slate-50 rounded-xl p-3">
+                                            <p className="text-[11px] font-medium text-slate-400 uppercase tracking-wider mb-1">Date</p>
+                                            <p className="text-sm font-semibold text-slate-700">{res.date}</p>
+                                        </div>
+                                        <div className="bg-slate-50 rounded-xl p-3">
+                                            <p className="text-[11px] font-medium text-slate-400 uppercase tracking-wider mb-1">Billed To</p>
+                                            <p className="text-sm font-semibold text-slate-700 truncate" title={res.billed_to}>{res.billed_to}</p>
+                                        </div>
+                                        <div className="bg-slate-50 rounded-xl p-3">
+                                            <p className="text-[11px] font-medium text-slate-400 uppercase tracking-wider mb-1">Card</p>
+                                            <p className="text-sm font-semibold text-slate-700">•••• {res.card_last_4}</p>
+                                        </div>
+                                        <div className="bg-slate-50 rounded-xl p-3">
+                                            <p className="text-[11px] font-medium text-slate-400 uppercase tracking-wider mb-1">Amount</p>
+                                            <p className="text-sm font-semibold text-slate-700">{res.amount?.toLocaleString()}</p>
+                                        </div>
+                                        <div className="bg-slate-50 rounded-xl p-3">
+                                            <p className="text-[11px] font-medium text-slate-400 uppercase tracking-wider mb-1">Currency</p>
+                                            <p className="text-sm font-semibold text-slate-700">{res.currency}</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            );
+                        })}
+                    </div>
+                </div>
+            )}
+        </div>
+    );
+}
