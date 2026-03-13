@@ -108,17 +108,20 @@ export async function POST(request: Request) {
     let status = "success";
 
     try {
-        // Ensure DOMMatrix exists in Node environment to satisfy pdf.js (used internally by pdf-parse)
-        if (typeof (globalThis as any).DOMMatrix === "undefined") {
-            (globalThis as any).DOMMatrix = class DOMMatrixStub {
-                constructor() {}
-            } as any;
+        // For pdf-parse 1.x: default export is a callable function
+        const pdfModule: any = await import("pdf-parse");
+        const pdfParse =
+            typeof pdfModule === "function"
+                ? pdfModule
+                : typeof pdfModule.default === "function"
+                ? pdfModule.default
+                : null;
+
+        if (!pdfParse) {
+            throw new Error("pdf-parse did not export a compatible parser function");
         }
 
-        // Use ESM import and the documented PDFParse export
-        const { PDFParse }: any = await import("pdf-parse");
-        const parser = new PDFParse({ data: new Uint8Array(buffer) });
-        const textResult = await parser.getText();
+        const textResult = await pdfParse(buffer);
         const pdfText = textResult.text;
 
         // 5. AI extraction
