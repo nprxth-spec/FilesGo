@@ -118,9 +118,18 @@ export async function POST(request: Request) {
             } as any;
         }
 
-        // Use CommonJS require so pdf-parse is always a callable function in Node
-        const pdfParse: (data: Buffer | Uint8Array) => Promise<{ text: string }> =
-            require("pdf-parse");
+        // Load pdf-parse via CommonJS require and normalize export shape
+        const pdfModule: any = require("pdf-parse");
+        const pdfParse: null | ((data: Buffer | Uint8Array) => Promise<{ text: string }>) =
+            typeof pdfModule === "function"
+                ? pdfModule
+                : typeof pdfModule.default === "function"
+                ? pdfModule.default
+                : null;
+
+        if (!pdfParse) {
+            throw new Error("pdf-parse module did not export a function");
+        }
 
         const textResult = await pdfParse(buffer);
         const pdfText = textResult.text;
