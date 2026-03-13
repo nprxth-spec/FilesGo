@@ -3,6 +3,9 @@ import { NextResponse } from "next/server";
 import { extractInvoiceData } from "@/lib/openai";
 import { syncToGoogle } from "@/lib/google";
 import { prisma } from "@/lib/prisma";
+import { createRequire } from "module";
+
+const require = createRequire(import.meta.url);
 
 // Disable Next.js body parser to handle raw FormData
 export const runtime = "nodejs";
@@ -115,26 +118,11 @@ export async function POST(request: Request) {
             } as any;
         }
 
-        const pdfModule: any = await import("pdf-parse");
-        let textResult: any;
-        // Try multiple known export shapes for pdf-parse across environments
-        try {
-            textResult = await pdfModule(buffer);
-        } catch {
-            try {
-                textResult = await pdfModule.default(buffer);
-            } catch {
-                if (pdfModule.default?.default) {
-                    textResult = await pdfModule.default.default(buffer);
-                } else {
-                    throw new Error("pdf-parse module did not export a compatible parser function");
-                }
-            }
-        }
+        // Use CommonJS require so pdf-parse is always a callable function in Node
+        const pdfParse: (data: Buffer | Uint8Array) => Promise<{ text: string }> =
+            require("pdf-parse");
 
-        if (!textResult || typeof textResult.text !== "string") {
-            throw new Error("Failed to extract text from PDF");
-        }
+        const textResult = await pdfParse(buffer);
         const pdfText = textResult.text;
 
         // 5. AI extraction
