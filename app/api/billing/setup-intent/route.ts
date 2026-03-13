@@ -27,11 +27,9 @@ export async function POST(request: Request) {
   }
 
   const stripeSecretKey = process.env.STRIPE_SECRET_KEY;
-  const stripePriceId = process.env.STRIPE_PRICE_ID;
-
-  if (!stripeSecretKey || !stripePriceId) {
+  if (!stripeSecretKey) {
     return NextResponse.json(
-      { error: "Stripe is not configured. Please set STRIPE_SECRET_KEY and STRIPE_PRICE_ID." },
+      { error: "Stripe is not configured. Please set STRIPE_SECRET_KEY." },
       { status: 500 }
     );
   }
@@ -39,36 +37,22 @@ export async function POST(request: Request) {
   const stripe = new Stripe(stripeSecretKey);
 
   try {
-    const { origin } = new URL(request.url);
-
-    // Reuse existing Stripe customer (and their saved card) if possible
     const customerId = await getOrCreateCustomer(
       stripe,
       session.user.email!,
       session.user.id
     );
 
-    const checkoutSession = await stripe.checkout.sessions.create({
-      mode: "subscription",
+    const setupIntent = await stripe.setupIntents.create({
       customer: customerId,
-      line_items: [
-        {
-          price: stripePriceId,
-          quantity: 1,
-        },
-      ],
-      success_url: `${origin}/dashboard/billing?status=success`,
-      cancel_url: `${origin}/dashboard/billing?status=cancelled`,
-      metadata: {
-        userId: session.user.id,
-      },
+      payment_method_types: ["card"],
     });
 
-    return NextResponse.json({ url: checkoutSession.url });
+    return NextResponse.json({ clientSecret: setupIntent.client_secret });
   } catch (err: any) {
-    console.error("Stripe checkout error:", err);
+    console.error("Stripe setup intent error:", err);
     return NextResponse.json(
-      { error: err.message ?? "Failed to create Stripe Checkout session." },
+      { error: err.message ?? "Failed to create SetupIntent." },
       { status: 500 }
     );
   }

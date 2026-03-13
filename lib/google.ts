@@ -74,9 +74,20 @@ export async function getSpreadsheetTabs(
         })) ?? [];
 
         return tabs;
-    } catch (error) {
-        console.error("Error fetching spreadsheet tabs:", error);
-        throw new Error("Failed to fetch spreadsheet tabs. Check the Sheet ID and permissions.");
+    } catch (error: any) {
+        // Log full error for debugging
+        console.error("Error fetching spreadsheet tabs:", error?.response?.data || error);
+
+        // Surface more helpful message to UI
+        const apiMessage: string | undefined =
+            error?.response?.data?.error?.message ||
+            error?.message;
+
+        if (apiMessage) {
+            throw new Error(apiMessage);
+        }
+
+        throw new Error("Failed to fetch spreadsheet tabs.");
     }
 }
 

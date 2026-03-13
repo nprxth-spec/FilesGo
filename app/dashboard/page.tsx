@@ -56,12 +56,6 @@ export default function DashboardPage() {
     const [folderError, setFolderError] = useState("");
     const [driveFolderLabel, setDriveFolderLabel] = useState("");
 
-    const buildFolderLabel = (leafName: string) => {
-        const now = new Date();
-        const year = now.getFullYear();
-        return `SA-TEAM(广告) > FB Receipt > ${year} > ${leafName}`;
-    };
-
     // Optional: root folder for picker start location
     const PICKER_ROOT_FOLDER_ID = "11-naB49cPhno_HpKcTbrmYPhNz_R8oJk";
 
@@ -103,13 +97,17 @@ export default function DashboardPage() {
                 setModeInitialized(true);
             }
 
-            // If we have an id but no label yet, try to resolve its name from Drive
+            // If we have an id but no label yet, try to resolve its path from Drive
             if (id && !driveFolderLabel) {
                 try {
                     const res = await fetch(`/api/drive/folder-meta?id=${encodeURIComponent(id)}`);
                     const data = await res.json();
-                    if (res.ok && data?.data?.name) {
-                        setDriveFolderLabel(buildFolderLabel(data.data.name as string));
+                    if (res.ok && data?.data) {
+                        setDriveFolderLabel(
+                            (data.data.path as string) ||
+                            (data.data.name as string) ||
+                            id
+                        );
                     }
                 } catch {
                     // ignore, we'll just fall back to showing the raw ID
@@ -213,7 +211,7 @@ export default function DashboardPage() {
                             setDriveFolderId(picked.id);
                             setDriveFolderMode("custom");
                             const leafName = picked.name || picked.id;
-                            setDriveFolderLabel(buildFolderLabel(leafName));
+                            setDriveFolderLabel(leafName);
 
                             // Persist selection immediately so it survives refresh
                             (async () => {
@@ -228,6 +226,22 @@ export default function DashboardPage() {
                                         setFolderError(data.error ?? "Failed to save folder");
                                     } else {
                                         await update();
+                                        // Refresh human-readable path after saving
+                                        try {
+                                            const metaRes = await fetch(
+                                                `/api/drive/folder-meta?id=${encodeURIComponent(picked.id)}`
+                                            );
+                                            const metaData = await metaRes.json();
+                                            if (metaRes.ok && metaData?.data) {
+                                                setDriveFolderLabel(
+                                                    (metaData.data.path as string) ||
+                                                    (metaData.data.name as string) ||
+                                                    leafName
+                                                );
+                                            }
+                                        } catch {
+                                            // ignore, keep fallback label
+                                        }
                                     }
                                 } catch (err: any) {
                                     setFolderError(err.message ?? "Failed to save folder");

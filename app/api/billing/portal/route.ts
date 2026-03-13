@@ -5,6 +5,7 @@ import { auth } from "@/lib/auth";
 export const runtime = "nodejs";
 
 async function getOrCreateCustomer(stripe: Stripe, email: string, userId: string) {
+  // Try to find an existing customer by email
   const existing = await stripe.customers.list({
     email,
     limit: 1,
@@ -27,11 +28,9 @@ export async function POST(request: Request) {
   }
 
   const stripeSecretKey = process.env.STRIPE_SECRET_KEY;
-  const stripePriceId = process.env.STRIPE_PRICE_ID;
-
-  if (!stripeSecretKey || !stripePriceId) {
+  if (!stripeSecretKey) {
     return NextResponse.json(
-      { error: "Stripe is not configured. Please set STRIPE_SECRET_KEY and STRIPE_PRICE_ID." },
+      { error: "Stripe is not configured. Please set STRIPE_SECRET_KEY." },
       { status: 500 }
     );
   }
@@ -40,35 +39,22 @@ export async function POST(request: Request) {
 
   try {
     const { origin } = new URL(request.url);
-
-    // Reuse existing Stripe customer (and their saved card) if possible
     const customerId = await getOrCreateCustomer(
       stripe,
       session.user.email!,
       session.user.id
     );
 
-    const checkoutSession = await stripe.checkout.sessions.create({
-      mode: "subscription",
+    const portalSession = await stripe.billingPortal.sessions.create({
       customer: customerId,
-      line_items: [
-        {
-          price: stripePriceId,
-          quantity: 1,
-        },
-      ],
-      success_url: `${origin}/dashboard/billing?status=success`,
-      cancel_url: `${origin}/dashboard/billing?status=cancelled`,
-      metadata: {
-        userId: session.user.id,
-      },
+      return_url: `${origin}/dashboard/settings`,
     });
 
-    return NextResponse.json({ url: checkoutSession.url });
+    return NextResponse.json({ url: portalSession.url });
   } catch (err: any) {
-    console.error("Stripe checkout error:", err);
+    console.error("Stripe portal error:", err);
     return NextResponse.json(
-      { error: err.message ?? "Failed to create Stripe Checkout session." },
+      { error: err.message ?? "Failed to create Stripe billing portal session." },
       { status: 500 }
     );
   }

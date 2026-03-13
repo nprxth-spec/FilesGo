@@ -2,7 +2,6 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { signOut } from "next-auth/react";
 import {
     Upload,
     History,
@@ -10,7 +9,7 @@ import {
     CreditCard,
     Zap,
     FileText,
-    LogOut,
+    Wrench,
     ChevronRight,
     PanelLeftClose,
     PanelLeftOpen,
@@ -20,9 +19,9 @@ import { useEffect, useState } from "react";
 const navLinks = [
     { href: "/dashboard", label: "Upload", icon: Upload },
     { href: "/dashboard/history", label: "History", icon: History },
-    { href: "/dashboard/integrations", label: "Integrations", icon: Settings },
-    { href: "/dashboard/billing", label: "Billing", icon: CreditCard },
+    { href: "/dashboard/integrations", label: "Integrations", icon: Wrench },
     { href: "/dashboard/naming", label: "Filename Rules", icon: FileText },
+    { href: "/dashboard/billing", label: "Billing", icon: CreditCard },
 ];
 
 export default function Sidebar() {
@@ -97,7 +96,7 @@ export default function Sidebar() {
                 })}
             </nav>
 
-            {/* Toggle + Sign out */}
+            {/* Toggle collapse */}
             <div className="border-t border-slate-800">
                 <div className="p-3">
                     <button
@@ -114,17 +113,6 @@ export default function Sidebar() {
                             <PanelLeftClose className="w-5 h-5" />
                         )}
                         {!collapsed && <span>Collapse sidebar</span>}
-                    </button>
-                </div>
-                <div className="p-3 border-t border-slate-800/80">
-                    <button
-                        onClick={() => signOut({ callbackUrl: "/" })}
-                        className={`w-full flex items-center ${
-                            collapsed ? "justify-center" : "gap-3"
-                        } px-3 py-2.5 rounded-xl text-sm font-medium text-slate-400 hover:text-white hover:bg-slate-800 transition-all cursor-pointer`}
-                    >
-                        <LogOut className="w-5 h-5" />
-                        {!collapsed && <span>Sign out</span>}
                     </button>
                 </div>
             </div>
