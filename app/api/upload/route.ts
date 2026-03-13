@@ -119,9 +119,23 @@ export async function POST(request: Request) {
         // 6. Determine filename using optional mapping based on last 4 digits
         filename = originalFilename;
         const last4 = invoiceData.card_last_4;
+        const billedTo = invoiceData.billed_to as string | undefined;
         const mapping = (user as any).filenameMapping as Record<string, string> | null | undefined;
         if (last4 && mapping && typeof mapping === "object" && mapping[last4]) {
             filename = `${mapping[last4]} ${originalFilename}`;
+        }
+
+        // 6.1 Append billed_to after filename, before extension if available
+        if (billedTo && billedTo.trim().length > 0) {
+            const trimmed = billedTo.trim();
+            const dotIndex = filename.lastIndexOf(".");
+            if (dotIndex > 0) {
+                const base = filename.slice(0, dotIndex);
+                const ext = filename.slice(dotIndex);
+                filename = `${base} (${trimmed})${ext}`;
+            } else {
+                filename = `${filename} (${trimmed})`;
+            }
         }
 
         // 7. Sync to Google Drive + Sheets
