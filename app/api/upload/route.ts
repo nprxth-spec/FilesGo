@@ -116,20 +116,25 @@ export async function POST(request: Request) {
         }
 
         const pdfModule: any = await import("pdf-parse");
-        const pdfParse =
-            typeof pdfModule === "function"
-                ? pdfModule
-                : typeof pdfModule.default === "function"
-                ? pdfModule.default
-                : typeof pdfModule.default?.default === "function"
-                ? pdfModule.default.default
-                : null;
-
-        if (!pdfParse) {
-            throw new Error("pdf-parse module did not export a callable parser function");
+        let textResult: any;
+        // Try multiple known export shapes for pdf-parse across environments
+        try {
+            textResult = await pdfModule(buffer);
+        } catch {
+            try {
+                textResult = await pdfModule.default(buffer);
+            } catch {
+                if (pdfModule.default?.default) {
+                    textResult = await pdfModule.default.default(buffer);
+                } else {
+                    throw new Error("pdf-parse module did not export a compatible parser function");
+                }
+            }
         }
 
-        const textResult = await pdfParse(buffer);
+        if (!textResult || typeof textResult.text !== "string") {
+            throw new Error("Failed to extract text from PDF");
+        }
         const pdfText = textResult.text;
 
         // 5. AI extraction
