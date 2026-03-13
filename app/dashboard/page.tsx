@@ -46,6 +46,7 @@ export default function DashboardPage() {
     const [currentIndex, setCurrentIndex] = useState<number>(-1);
     const [results, setResults] = useState<(InvoiceResult | { filename: string, error: string })[]>([]);
     const [stage, setStage] = useState<Stage>("idle");
+    const [showBatchComplete, setShowBatchComplete] = useState(false);
 
     // Drive folder selection
     const [driveFolderId, setDriveFolderId] = useState("");
@@ -249,7 +250,10 @@ export default function DashboardPage() {
         currentResults: (InvoiceResult | { filename: string, error: string })[]
     ) => {
         if (index >= files.length) {
+            // All files processed
+            setCurrentIndex(-1);
             setStage("done");
+            setShowBatchComplete(true);
             return;
         }
 
@@ -318,6 +322,14 @@ export default function DashboardPage() {
     const resetState = () => {
         setStage("idle");
         setResults([]);
+        setQueue([]);
+        setCurrentIndex(-1);
+    };
+
+    // Acknowledge batch completion: clear working state but keep results visible
+    const acknowledgeBatchComplete = () => {
+        setShowBatchComplete(false);
+        setStage("idle");
         setQueue([]);
         setCurrentIndex(-1);
     };
@@ -511,6 +523,34 @@ export default function DashboardPage() {
                     </div>
                 )}
             </div>
+
+            {/* Batch Complete Modal */}
+            {showBatchComplete && (
+                <div className="fixed inset-0 z-30 flex items-center justify-center bg-black/40">
+                    <div className="bg-white rounded-2xl shadow-xl max-w-sm w-full mx-4 p-6">
+                        <div className="flex items-center gap-3 mb-4">
+                            <div className="w-9 h-9 rounded-full bg-green-100 flex items-center justify-center">
+                                <CheckCircle2 className="w-5 h-5 text-green-600" />
+                            </div>
+                            <div>
+                                <p className="text-base font-semibold text-slate-900">Batch Complete!</p>
+                                <p className="text-xs text-slate-500">
+                                    Processed {results.length} file{results.length > 1 ? "s" : ""}. See the details in Processing Results.
+                                </p>
+                            </div>
+                        </div>
+                        <div className="flex justify-end gap-2">
+                            <button
+                                type="button"
+                                onClick={acknowledgeBatchComplete}
+                                className="px-4 py-2 rounded-xl bg-blue-600 text-white text-sm font-medium hover:bg-blue-700 cursor-pointer"
+                            >
+                                OK
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
 
             {/* Results List */}
             {results.length > 0 && (
