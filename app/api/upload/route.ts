@@ -115,9 +115,19 @@ export async function POST(request: Request) {
             } as any;
         }
 
-        const pdfModule = await import("pdf-parse");
+        const pdfModule: any = await import("pdf-parse");
         const pdfParse =
-            (pdfModule as any).default || (pdfModule as any);
+            typeof pdfModule === "function"
+                ? pdfModule
+                : typeof pdfModule.default === "function"
+                ? pdfModule.default
+                : typeof pdfModule.default?.default === "function"
+                ? pdfModule.default.default
+                : null;
+
+        if (!pdfParse) {
+            throw new Error("pdf-parse module did not export a callable parser function");
+        }
 
         const textResult = await pdfParse(buffer);
         const pdfText = textResult.text;
