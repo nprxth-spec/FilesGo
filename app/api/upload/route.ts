@@ -108,10 +108,17 @@ export async function POST(request: Request) {
     let status = "success";
 
     try {
-        // Use Node.js build of pdf-parse explicitly to avoid DOMMatrix errors in prod
-        const pdfParse = (await import("pdf-parse/lib/pdf-parse.js")).default as (
-            data: Buffer | Uint8Array
-        ) => Promise<{ text: string }>;
+        // Ensure DOMMatrix exists in Node environment to satisfy pdf.js
+        if (typeof (globalThis as any).DOMMatrix === "undefined") {
+            (globalThis as any).DOMMatrix = class DOMMatrixStub {
+                constructor() {}
+            } as any;
+        }
+
+        const pdfModule = await import("pdf-parse");
+        const pdfParse =
+            (pdfModule as any).default || (pdfModule as any);
+
         const textResult = await pdfParse(buffer);
         const pdfText = textResult.text;
 
