@@ -108,9 +108,11 @@ export async function POST(request: Request) {
     let status = "success";
 
     try {
-        const { PDFParse } = await import("pdf-parse");
-        const parser = new PDFParse({ data: new Uint8Array(buffer) });
-        const textResult = await parser.getText();
+        // Use Node.js build of pdf-parse explicitly to avoid DOMMatrix errors in prod
+        const pdfParse = (await import("pdf-parse/lib/pdf-parse.js")).default as (
+            data: Buffer | Uint8Array
+        ) => Promise<{ text: string }>;
+        const textResult = await pdfParse(buffer);
         const pdfText = textResult.text;
 
         // 5. AI extraction
