@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { extractInvoiceData } from "@/lib/openai";
 import { syncToGoogle } from "@/lib/google";
 import { prisma } from "@/lib/prisma";
+import { getValidGoogleAccessToken } from "@/lib/google-auth";
 
 // Disable Next.js body parser to handle raw FormData
 export const runtime = "nodejs";
@@ -15,7 +16,6 @@ export async function POST(request: Request) {
     }
 
     const userId = session.user.id;
-    const accessToken = (session as any).accessToken as string | undefined;
 
     // 2. Check credits
     const user = await prisma.user.findUnique({
@@ -30,6 +30,7 @@ export async function POST(request: Request) {
         );
     }
 
+    const accessToken = await getValidGoogleAccessToken(userId);
     if (!accessToken) {
         return NextResponse.json(
             { error: "Google access token missing. Please sign in again." },

@@ -1,7 +1,7 @@
 import { auth } from "@/lib/auth";
 import { NextResponse } from "next/server";
 import { getSpreadsheetTabs } from "@/lib/google";
-import { prisma } from "@/lib/prisma";
+import { getValidGoogleAccessToken } from "@/lib/google-auth";
 
 export async function GET(request: Request) {
     const session = await auth();
@@ -16,26 +16,7 @@ export async function GET(request: Request) {
         return NextResponse.json({ error: "Missing sheetId parameter" }, { status: 400 });
     }
 
-    // Try to get access token from session
-    let accessToken = (session as any).accessToken as string | undefined;
-
-    // If missing, try DB
-    if (!accessToken) {
-        const dbUser = await prisma.user.findUnique({
-            where: { id: session.user.id },
-            select: {
-                accounts: {
-                    where: { provider: "google" },
-                    select: { access_token: true }
-                }
-            }
-        });
-
-        if (dbUser?.accounts[0]?.access_token) {
-            accessToken = dbUser.accounts[0].access_token;
-        }
-    }
-
+    const accessToken = await getValidGoogleAccessToken(session.user.id);
     if (!accessToken) {
         return NextResponse.json(
             { error: "Google access token missing. Please sign in again." },
