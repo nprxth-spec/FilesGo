@@ -11,33 +11,35 @@
   html {
     scroll-behavior: smooth;
     font-family: var(--font-inter), system-ui, -apple-system, sans-serif;
+    -webkit-text-size-adjust: 100%;
+  }
+
+  .font-heading {
+    font-family: var(--font-heading), var(--font-inter), system-ui, sans-serif;
   }
 
   body {
     margin: 0;
     padding: 0;
     min-height: 100vh;
+    overflow-x: hidden;
   }
 }
 
 @layer utilities {
 
-  /* Gradient brand */
+  /* Brand (teal — matches landing) */
   .gradient-brand {
-    background: linear-gradient(135deg, #2563eb 0%, #7c3aed 100%);
+    background: #0d9488;
   }
 
-  /* Gradient text */
   .gradient-text {
-    background: linear-gradient(135deg, #2563eb 0%, #7c3aed 100%);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    background-clip: text;
+    color: #0d9488;
   }
 
   /* Progress bar shimmer */
   .progress-bar {
-    background: linear-gradient(90deg, #2563eb, #7c3aed, #2563eb);
+    background: linear-gradient(90deg, #0d9488, #14b8a6, #0d9488);
     background-size: 200% 100%;
     animation: shimmer 1.5s linear infinite;
   }
@@ -80,6 +82,23 @@
   100% {
     background-position: 200% 0;
   }
+}
+
+/* Landing page theme */
+.landing-bg {
+  background-color: #fafaf9;
+}
+
+.landing-accent {
+  color: #0d9488;
+}
+
+.landing-accent-bg {
+  background-color: #0d9488;
+}
+
+.landing-accent-bg-hover:hover {
+  background-color: #0f766e;
 }
 
 /* Scrollbar */

@@ -29,6 +29,7 @@ export default function BillingCompositePage() {
   const [selectedPaymentMethodId, setSelectedPaymentMethodId] = useState<string | null>(null);
   const [showAddCard, setShowAddCard] = useState(false);
   const [addingCardError, setAddingCardError] = useState<string | null>(null);
+  const [showAddCardFirstHint, setShowAddCardFirstHint] = useState(false);
 
   const credits = (session?.user as any)?.credits ?? 0;
   const isPro = credits > 100;
@@ -163,9 +164,9 @@ export default function BillingCompositePage() {
   };
 
   return (
-    <div className="max-w-4xl mx-auto space-y-10">
+    <div className="max-w-4xl mx-auto space-y-8 sm:space-y-10 w-full px-0 sm:px-0">
       <div>
-        <h1 className="text-3xl font-semibold text-slate-900 mb-1">Billing</h1>
+        <h1 className="text-2xl sm:text-3xl font-semibold text-slate-900 mb-1">Billing</h1>
         <p className="text-slate-600 text-base">
           Manage your Files Go plan, payment methods, invoices, and account.
         </p>
@@ -173,13 +174,9 @@ export default function BillingCompositePage() {
 
       {/* Billing section */}
       <section className="space-y-4">
-        <h2 className="text-base font-semibold text-slate-700 uppercase tracking-wide">
-          Billing
-        </h2>
-
         {/* Current plan & credits + plans */}
-        <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-6 space-y-5">
-            <div className="flex items-center justify-between">
+        <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-4 sm:p-6 space-y-5">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
               <div>
                 <p className="text-sm font-semibold text-slate-500 uppercase tracking-wide">
                   Current plan
@@ -237,7 +234,16 @@ export default function BillingCompositePage() {
               {/* Pro plan card */}
               <button
                 type="button"
-                onClick={() => !isPro && setShowUpgradeConfirm(true)}
+                onClick={() => {
+                  if (isPro || loadingCheckout) return;
+                  if (paymentMethods.length === 0) {
+                    setShowAddCard(true);
+                    setAddingCardError(null);
+                    setShowAddCardFirstHint(true);
+                  } else {
+                    setShowUpgradeConfirm(true);
+                  }
+                }}
                 disabled={loadingCheckout || isPro}
                 className={`rounded-2xl border px-4 py-3 text-left flex flex-col gap-2 cursor-pointer disabled:opacity-70 ${
                   isPro
@@ -276,7 +282,7 @@ export default function BillingCompositePage() {
           </div>
 
         {/* Payment methods card */}
-        <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-6 space-y-4">
+        <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-4 sm:p-6 space-y-4">
           <p className="text-base font-semibold text-slate-900">
             Payment methods
           </p>
@@ -349,11 +355,12 @@ export default function BillingCompositePage() {
               type="button"
               onClick={() => {
                 setAddingCardError(null);
-                setShowAddCard((prev) => !prev);
+                setShowAddCardFirstHint(false);
+                setShowAddCard(true);
               }}
               className="inline-flex items-center gap-2 px-3 py-2 rounded-xl border border-slate-200 text-xs font-medium text-slate-700 hover:bg-slate-50 cursor-pointer disabled:opacity-60"
             >
-              {showAddCard ? "Close add card form" : "Add new card"}
+              Add new card
             </button>
             <button
               type="button"
@@ -364,28 +371,10 @@ export default function BillingCompositePage() {
               {openingPortal ? "Opening Stripe portal..." : "Open in Stripe"}
             </button>
           </div>
-
-          {showAddCard && stripePromise && (
-            <div className="mt-4 border border-dashed border-slate-200 rounded-xl p-4 bg-slate-50/60">
-              <p className="text-xs font-medium text-slate-700 mb-2">
-                Add a new card
-              </p>
-              <Elements stripe={stripePromise}>
-                <AddCardForm
-                  onSuccess={async () => {
-                    setShowAddCard(false);
-                    setAddingCardError(null);
-                    await loadPaymentMethods();
-                  }}
-                  onError={(msg) => setAddingCardError(msg)}
-                />
-              </Elements>
-            </div>
-          )}
         </div>
 
         {/* Receipts / invoices card */}
-        <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-6 space-y-4">
+        <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-4 sm:p-6 space-y-4">
           <p className="text-base font-semibold text-slate-900">
             Receipts &amp; invoices
           </p>
@@ -404,7 +393,7 @@ export default function BillingCompositePage() {
               No invoices found for this account yet.
             </p>
           ) : (
-            <div className="border border-slate-100 rounded-xl overflow-hidden max-h-72 overflow-y-auto">
+            <div className="border border-slate-100 rounded-xl overflow-hidden max-h-72 overflow-y-auto overflow-x-auto">
               <table className="min-w-full border-collapse text-xs">
                 <thead className="bg-slate-50 border-b border-slate-100">
                   <tr>
@@ -446,7 +435,7 @@ export default function BillingCompositePage() {
                               href={inv.hosted_invoice_url}
                               target="_blank"
                               rel="noopener noreferrer"
-                              className="text-blue-600 hover:text-blue-800 underline"
+                              className="text-teal-600 hover:text-teal-800 underline"
                             >
                               View
                             </a>
@@ -463,6 +452,52 @@ export default function BillingCompositePage() {
           )}
         </div>
       </section>
+
+      {/* Add card modal */}
+      {showAddCard && stripePromise && (
+        <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/50">
+          <div className="bg-white rounded-2xl shadow-xl max-w-md w-full mx-4 p-6">
+            <div className="flex items-center justify-between mb-4">
+              <p className="text-base font-semibold text-slate-900">
+                Add payment method
+              </p>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowAddCard(false);
+                  setShowAddCardFirstHint(false);
+                  setAddingCardError(null);
+                }}
+                className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 cursor-pointer"
+                aria-label="Close"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+            {showAddCardFirstHint && (
+              <p className="text-sm font-medium text-amber-800 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 mb-4">
+                Add a payment method first to upgrade to Files Go Pro.
+              </p>
+            )}
+            {addingCardError && (
+              <p className="text-sm text-red-600 mb-3">{addingCardError}</p>
+            )}
+            <Elements stripe={stripePromise}>
+              <AddCardForm
+                onSuccess={async () => {
+                  setShowAddCard(false);
+                  setAddingCardError(null);
+                  setShowAddCardFirstHint(false);
+                  await loadPaymentMethods();
+                }}
+                onError={(msg) => setAddingCardError(msg)}
+              />
+            </Elements>
+          </div>
+        </div>
+      )}
 
       {/* Upgrade confirmation modal */}
       {showUpgradeConfirm && !isPro && (

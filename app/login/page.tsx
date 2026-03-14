@@ -5,10 +5,10 @@ import { Zap, Shield, FileText } from "lucide-react";
 
 export default function LoginPage() {
     return (
-        <div className="min-h-screen bg-gradient-to-br from-slate-900 via-blue-950 to-slate-900 flex items-center justify-center p-6">
+        <div className="min-h-screen bg-gradient-to-br from-slate-900 via-teal-950 to-slate-900 flex items-center justify-center p-6">
             {/* Background orbs */}
             <div className="absolute inset-0 overflow-hidden pointer-events-none">
-                <div className="absolute top-1/4 left-1/4 w-96 h-96 rounded-full bg-blue-600/10 blur-3xl" />
+                <div className="absolute top-1/4 left-1/4 w-96 h-96 rounded-full bg-teal-600/10 blur-3xl" />
                 <div className="absolute bottom-1/4 right-1/4 w-96 h-96 rounded-full bg-violet-600/10 blur-3xl" />
             </div>
 
@@ -17,7 +17,7 @@ export default function LoginPage() {
                 <div className="bg-white/5 backdrop-blur-xl border border-white/10 rounded-3xl p-8 shadow-2xl">
                     {/* Logo */}
                     <div className="flex items-center justify-center gap-3 mb-8">
-                        <div className="w-10 h-10 rounded-xl gradient-brand flex items-center justify-center shadow-lg">
+                        <div className="w-10 h-10 rounded-xl landing-accent-bg flex items-center justify-center shadow-lg">
                             <Zap className="w-5 h-5 text-white" />
                         </div>
                         <span className="text-xl font-bold text-white">Files Go</span>
@@ -87,8 +87,8 @@ export default function LoginPage() {
                                 key={title}
                                 className="flex items-start gap-3 p-3 rounded-xl bg-white/5 border border-white/5"
                             >
-                                <div className="w-8 h-8 rounded-lg bg-blue-500/10 flex items-center justify-center shrink-0">
-                                    <Icon className="w-4 h-4 text-blue-400" />
+                                <div className="w-8 h-8 rounded-lg bg-teal-500/10 flex items-center justify-center shrink-0">
+                                    <Icon className="w-4 h-4 text-teal-500" />
                                 </div>
                                 <div>
                                     <p className="text-white text-sm font-medium">{title}</p>
@@ -101,11 +101,11 @@ export default function LoginPage() {
                     {/* Privacy notice */}
                     <p className="text-center text-xs text-slate-500 mt-6 leading-relaxed">
                         By continuing, you agree to our{" "}
-                        <a href="#" className="text-blue-400 hover:underline">
+                        <a href="#" className="text-teal-500 hover:underline">
                             Terms of Service
                         </a>{" "}
                         and{" "}
-                        <a href="#" className="text-blue-400 hover:underline">
+                        <a href="#" className="text-teal-500 hover:underline">
                             Privacy Policy
                         </a>
                         . We only access Drive and Sheets files created by Files Go.

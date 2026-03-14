@@ -242,7 +242,7 @@ export default function IntegrationsPage() {
     };
 
     return (
-        <div className="max-w-3xl mx-auto pb-12">
+        <div className="max-w-3xl mx-auto pb-12 w-full min-w-0">
             <div className="mb-8">
                 <h1 className="text-2xl font-bold text-slate-900 mb-1">Integrations</h1>
                 <p className="text-slate-500">Connect Google Sheets to receive invoice data.</p>
@@ -276,7 +276,7 @@ export default function IntegrationsPage() {
                                     <button
                                         type="button"
                                         onClick={() => setProfileMenuOpen((v) => !v)}
-                                        className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 flex items-center justify-between cursor-pointer hover:bg-slate-50"
+                                        className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-teal-500 flex items-center justify-between cursor-pointer hover:bg-slate-50"
                                     >
                                         <span className="truncate">
                                             {profiles.find((p) => p.id === activeProfileId)?.name ?? "Select profile"}
@@ -312,7 +312,7 @@ export default function IntegrationsPage() {
                                             );
                                             setProfiles(nextProfiles);
                                         }}
-                                        className="mt-2 sm:mt-0 w-full max-w-xs px-3 py-2 rounded-lg border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                        className="mt-2 sm:mt-0 w-full max-w-xs px-3 py-2 rounded-lg border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500"
                                         placeholder="Profile name"
                                     />
                                 )}
@@ -372,7 +372,7 @@ export default function IntegrationsPage() {
                                 <button
                                     type="button"
                                     onClick={() => setSheetMenuOpen((v) => !v)}
-                                    className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-sm bg-white text-left flex items-center justify-between hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent cursor-pointer"
+                                    className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-sm bg-white text-left flex items-center justify-between hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent cursor-pointer"
                                 >
                                     <span className={sheetId ? "text-slate-800" : "text-slate-400"}>
                                         {loadingSheets
@@ -417,7 +417,7 @@ export default function IntegrationsPage() {
                                         if (tabs.length > 0) setTabMenuOpen((v) => !v);
                                     }}
                                     disabled={tabs.length === 0}
-                                    className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-sm bg-white text-left hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-slate-50 disabled:text-slate-400 cursor-pointer disabled:cursor-not-allowed"
+                                    className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-sm bg-white text-left hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-teal-500 disabled:bg-slate-50 disabled:text-slate-400 cursor-pointer disabled:cursor-not-allowed"
                                 >
                                     <span className={sheetName && tabs.length > 0 ? "text-slate-800" : "text-slate-400"}>
                                         {tabs.length === 0
@@ -471,7 +471,7 @@ export default function IntegrationsPage() {
                                         <select
                                             value={(sheetMapping as any)[field.key] || ""}
                                             onChange={e => updateMapping(field.key as any, e.target.value)}
-                                            className="px-3 py-2 rounded-lg border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono text-slate-700 w-full"
+                                            className="px-3 py-2 rounded-lg border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500 font-mono text-slate-700 w-full"
                                         >
                                             <option value="">- Skip -</option>
                                             {colOptions.map(col => (
@@ -494,7 +494,7 @@ export default function IntegrationsPage() {
                             href="https://sheets.google.com/create"
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="flex items-center gap-1.5 text-sm text-blue-600 hover:text-blue-800 transition-colors order-2 sm:order-1"
+                            className="flex items-center gap-1.5 text-sm text-teal-600 hover:text-teal-800 transition-colors order-2 sm:order-1"
                         >
                             Create new Sheet <ExternalLink className="w-3.5 h-3.5" />
                         </a>
@@ -502,7 +502,7 @@ export default function IntegrationsPage() {
                         <button
                             onClick={handleSave}
                             disabled={saving || !sheetId}
-                            className="flex items-center justify-center gap-2 px-6 py-2.5 rounded-xl bg-blue-600 text-white text-sm font-medium hover:bg-blue-700 disabled:opacity-50 transition-all shadow-sm order-1 sm:order-2 w-full sm:w-auto cursor-pointer disabled:cursor-not-allowed"
+                            className="flex items-center justify-center gap-2 px-6 py-2.5 rounded-xl landing-accent-bg text-white text-sm font-medium hover:opacity-95 disabled:opacity-50 transition-all shadow-sm order-1 sm:order-2 w-full sm:w-auto cursor-pointer disabled:cursor-not-allowed"
                         >
                             {saving ? (
                                 <Loader2 className="w-4 h-4 animate-spin" />

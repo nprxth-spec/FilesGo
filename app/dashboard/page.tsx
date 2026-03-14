@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import { useDropzone } from "react-dropzone";
 import { useSession } from "next-auth/react";
 import {
@@ -53,11 +53,24 @@ export default function DashboardPage() {
     const [driveFolderMode, setDriveFolderMode] = useState<"auto" | "custom">("auto");
     const [modeInitialized, setModeInitialized] = useState(false);
     const [modeMenuOpen, setModeMenuOpen] = useState(false);
+    const modeMenuRef = useRef<HTMLDivElement | null>(null);
     const [folderError, setFolderError] = useState("");
     const [driveFolderLabel, setDriveFolderLabel] = useState("");
 
     // Optional: root folder for picker start location
     const PICKER_ROOT_FOLDER_ID = "11-naB49cPhno_HpKcTbrmYPhNz_R8oJk";
+
+    // Close mode dropdown when clicking outside
+    useEffect(() => {
+        if (!modeMenuOpen) return;
+        const handleClickOutside = (e: MouseEvent) => {
+            if (modeMenuRef.current && !modeMenuRef.current.contains(e.target as Node)) {
+                setModeMenuOpen(false);
+            }
+        };
+        document.addEventListener("mousedown", handleClickOutside);
+        return () => document.removeEventListener("mousedown", handleClickOutside);
+    }, [modeMenuOpen]);
 
     // Initialize folder ID and mode from session / API once on mount,
     // and resolve a human-readable label for the folder if present.
@@ -353,10 +366,10 @@ export default function DashboardPage() {
     const currentFile = isProcessing ? queue[currentIndex] : null;
 
     return (
-        <div className="max-w-4xl mx-auto">
-            <div className="mb-8 flex items-center justify-between">
-                <div>
-                    <h1 className="text-2xl font-bold text-slate-900 mb-1">Batch Upload Invoices</h1>
+        <div className="max-w-4xl mx-auto w-full min-w-0">
+            <div className="mb-6 sm:mb-8 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                <div className="min-w-0">
+                    <h1 className="text-xl sm:text-2xl font-bold text-slate-900 mb-1">Batch Upload Invoices</h1>
                     <p className="text-slate-500">
                         Drop multiple Facebook Ads PDF invoices to extract and sync automatically.
                     </p>
@@ -378,11 +391,11 @@ export default function DashboardPage() {
                     <p className="text-xs text-slate-400 mb-1">
                         Choose whether to let the app create a monthly folder automatically, or always upload into a specific folder you pick from Google Drive.
                     </p>
-                    <div className="mt-1 relative inline-block">
+                    <div className="mt-1 relative inline-block" ref={modeMenuRef}>
                         <button
                             type="button"
                             onClick={() => setModeMenuOpen((v) => !v)}
-                            className="w-full sm:w-80 px-3 py-2 rounded-xl border border-slate-200 bg-white text-xs text-slate-700 flex items-center justify-between hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent shadow-sm cursor-pointer"
+                            className="w-full sm:w-80 px-3 py-2 rounded-xl border border-slate-200 bg-white text-xs text-slate-700 flex items-center justify-between hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent shadow-sm cursor-pointer"
                         >
                             <span>
                                 {driveFolderMode === "auto"
@@ -453,7 +466,7 @@ export default function DashboardPage() {
                                     href={`https://drive.google.com/drive/folders/${driveFolderId}`}
                                     target="_blank"
                                     rel="noopener noreferrer"
-                                    className="font-medium text-blue-600 hover:text-blue-800 underline"
+                                    className="font-medium text-teal-600 hover:text-teal-800 underline"
                                 >
                                     {driveFolderLabel || driveFolderId}
                                 </a>
@@ -480,18 +493,18 @@ export default function DashboardPage() {
             <div
                 {...getRootProps()}
                 className={`relative rounded-2xl border-2 border-dashed p-12 text-center cursor-pointer transition-all duration-200 mb-8 ${isDragActive
-                        ? "border-blue-500 bg-blue-50"
+                        ? "border-teal-500 bg-teal-50"
                         : stage === "done"
                             ? "border-green-400 bg-green-50"
-                            : "border-slate-200 bg-white hover:border-blue-300 hover:bg-blue-50/30"
+                            : "border-slate-200 bg-white hover:border-teal-300 hover:bg-teal-50/30"
                     }`}
             >
                 <input {...getInputProps()} />
 
                 {stage === "idle" && (
                     <div>
-                        <div className="w-16 h-16 rounded-2xl bg-blue-50 flex items-center justify-center mx-auto mb-4 group-hover:scale-110 transition-transform">
-                            <Upload className="w-8 h-8 text-blue-500" />
+                        <div className="w-16 h-16 rounded-2xl bg-teal-50 flex items-center justify-center mx-auto mb-4 group-hover:scale-110 transition-transform">
+                            <Upload className="w-8 h-8 text-teal-500" />
                         </div>
                         <p className="text-lg font-semibold text-slate-700 mb-1">
                             {isDragActive ? "Drop PDFs here…" : "Drag & drop your invoice PDFs"}
@@ -508,9 +521,9 @@ export default function DashboardPage() {
                 {isProcessing && currentFile && (
                     <div>
                         <div className="flex items-center justify-center mb-4">
-                            <div className="w-16 h-16 rounded-2xl bg-blue-50 flex items-center justify-center mx-auto relative">
-                                <FileText className="w-8 h-8 text-blue-500" />
-                                <div className="absolute -bottom-2 -right-2 w-6 h-6 rounded-full bg-blue-600 flex items-center justify-center text-white text-[10px] font-bold">
+                            <div className="w-16 h-16 rounded-2xl bg-teal-50 flex items-center justify-center mx-auto relative">
+                                <FileText className="w-8 h-8 text-teal-500" />
+                                <div className="absolute -bottom-2 -right-2 w-6 h-6 rounded-full landing-accent-bg flex items-center justify-center text-white text-[10px] font-bold">
                                     {currentIndex + 1}/{queue.length}
                                 </div>
                             </div>
@@ -557,7 +570,7 @@ export default function DashboardPage() {
                             <button
                                 type="button"
                                 onClick={acknowledgeBatchComplete}
-                                className="px-4 py-2 rounded-xl bg-blue-600 text-white text-sm font-medium hover:bg-blue-700 cursor-pointer"
+                                className="px-4 py-2 rounded-xl landing-accent-bg text-white text-sm font-medium hover:opacity-95 cursor-pointer"
                             >
                                 OK
                             </button>
@@ -612,7 +625,7 @@ export default function DashboardPage() {
                                                 href={res.driveLink}
                                                 target="_blank"
                                                 rel="noopener noreferrer"
-                                                className="shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-blue-100 bg-blue-50 text-blue-600 text-xs font-semibold hover:bg-blue-100 transition-colors"
+                                                className="shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-teal-100 bg-teal-50 text-teal-600 text-xs font-semibold hover:bg-teal-100 transition-colors"
                                             >
                                                 <HardDrive className="w-3.5 h-3.5" /> Drive
                                             </a>

@@ -79,9 +79,9 @@ export default function NamingRulesPage() {
   };
 
   return (
-    <div className="max-w-3xl mx-auto pb-12">
-      <div className="mb-8">
-        <h1 className="text-2xl font-bold text-slate-900 mb-1">Filename Mapping</h1>
+    <div className="max-w-3xl mx-auto pb-12 w-full min-w-0">
+      <div className="mb-6 sm:mb-8">
+        <h1 className="text-xl sm:text-2xl font-bold text-slate-900 mb-1">Filename Mapping</h1>
         <p className="text-slate-500">
           Map the last 4 card digits to a filename prefix. The prefix will be placed in front of the original file name.
         </p>
@@ -110,7 +110,7 @@ export default function NamingRulesPage() {
           value={rawText}
           onChange={(e) => setRawText(e.target.value)}
           rows={10}
-          className="w-full px-4 py-3 rounded-xl border border-slate-200 text-sm font-mono text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-y"
+          className="w-full px-4 py-3 rounded-xl border border-slate-200 text-sm font-mono text-slate-800 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent resize-y"
           placeholder={`5991=WF-0004-1;\n5821=WF-0004-2;\n9649=WF-0004-9;`}
         />
 
@@ -122,7 +122,7 @@ export default function NamingRulesPage() {
           <button
             onClick={handleSave}
             disabled={saving || loading}
-            className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-blue-600 text-white text-sm font-medium hover:bg-blue-700 disabled:opacity-50 transition-colors shadow-sm cursor-pointer disabled:cursor-not-allowed"
+            className="flex items-center gap-2 px-5 py-2.5 rounded-xl landing-accent-bg text-white text-sm font-medium hover:opacity-95 disabled:opacity-50 transition-colors shadow-sm cursor-pointer disabled:cursor-not-allowed"
           >
             {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
             {saved ? "Saved" : "Save Rules"}

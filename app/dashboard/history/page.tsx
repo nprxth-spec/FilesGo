@@ -44,9 +44,9 @@ export default function HistoryPage() {
     const totalPages = Math.ceil(total / limit);
 
     return (
-        <div className="max-w-5xl mx-auto">
-            <div className="mb-8">
-                <h1 className="text-2xl font-bold text-slate-900 mb-1">Invoice History</h1>
+        <div className="max-w-5xl mx-auto w-full min-w-0">
+            <div className="mb-6 sm:mb-8">
+                <h1 className="text-xl sm:text-2xl font-bold text-slate-900 mb-1">Invoice History</h1>
                 <p className="text-slate-500">
                     {total} invoice{total !== 1 ? "s" : ""} processed
                 </p>
@@ -55,7 +55,7 @@ export default function HistoryPage() {
             <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
                 {loading ? (
                     <div className="flex items-center justify-center py-20">
-                        <Loader2 className="w-6 h-6 text-blue-500 animate-spin" />
+                        <Loader2 className="w-6 h-6 text-teal-500 animate-spin" />
                     </div>
                 ) : logs.length === 0 ? (
                     <div className="flex flex-col items-center justify-center py-20 text-center">
@@ -91,8 +91,8 @@ export default function HistoryPage() {
                                     >
                                         <td className="px-5 py-4">
                                             <div className="flex items-center gap-2.5">
-                                                <div className="w-7 h-7 rounded-lg bg-blue-50 flex items-center justify-center shrink-0">
-                                                    <FileText className="w-3.5 h-3.5 text-blue-500" />
+                                                <div className="w-7 h-7 rounded-lg bg-teal-50 flex items-center justify-center shrink-0">
+                                                    <FileText className="w-3.5 h-3.5 text-teal-500" />
                                                 </div>
                                                 <span
                                                     className="font-medium text-slate-800 max-w-[180px] truncate"
@@ -141,7 +141,7 @@ export default function HistoryPage() {
                                                     href={log.driveLink}
                                                     target="_blank"
                                                     rel="noopener noreferrer"
-                                                    className="flex items-center gap-1 text-blue-600 hover:text-blue-800 font-medium transition-colors"
+                                                    className="flex items-center gap-1 text-teal-600 hover:text-teal-800 font-medium transition-colors"
                                                 >
                                                     View <ExternalLink className="w-3.5 h-3.5" />
                                                 </a>

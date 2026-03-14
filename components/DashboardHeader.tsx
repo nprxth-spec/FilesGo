@@ -44,24 +44,24 @@ export function DashboardHeader({
 
   return (
     <>
-      <header className="h-16 bg-white border-b border-slate-100 flex items-center justify-between px-6 sticky top-0 z-10">
+      <header className="h-14 sm:h-16 bg-white border-b border-slate-100 flex items-center justify-between px-4 sm:px-6 sticky top-0 z-20 shrink-0">
         <div />
 
-        <div className="flex items-center gap-4 relative" ref={menuRef}>
+        <div className="flex items-center gap-2 sm:gap-4 relative" ref={menuRef}>
           {/* Credits badge */}
-          <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-blue-50 border border-blue-100">
-            <Zap className="w-3.5 h-3.5 text-blue-600" />
-            <span className="text-sm font-semibold text-blue-700">
-              {credits} credits
+          <div className="flex items-center gap-1.5 sm:gap-2 px-2 sm:px-3 py-1 sm:py-1.5 rounded-full bg-teal-50 border border-teal-100">
+            <Zap className="w-3.5 h-3.5 text-teal-600 shrink-0" />
+            <span className="text-xs sm:text-sm font-semibold text-teal-700">
+              {credits}
             </span>
-            <span className="text-xs text-blue-400">remaining</span>
+            <span className="hidden sm:inline text-xs text-teal-500">credits</span>
           </div>
 
           {/* User avatar as profile menu trigger */}
           <button
             type="button"
             onClick={() => setMenuOpen((v) => !v)}
-            className="flex items-center justify-center w-9 h-9 rounded-full hover:ring-2 hover:ring-slate-200 transition-all cursor-pointer"
+            className="flex items-center justify-center w-8 h-8 sm:w-9 sm:h-9 rounded-full hover:ring-2 hover:ring-slate-200 transition-all cursor-pointer shrink-0"
             aria-haspopup="menu"
             aria-expanded={menuOpen}
           >
@@ -69,19 +69,19 @@ export function DashboardHeader({
               <Image
                 src={user.image}
                 alt={user.name ?? "User"}
-                width={32}
-                height={32}
-                className="rounded-full ring-2 ring-white shadow"
+                width={36}
+                height={36}
+                className="rounded-full ring-2 ring-white shadow w-8 h-8 sm:w-9 sm:h-9 object-cover"
               />
             ) : (
-              <div className="w-9 h-9 rounded-full bg-blue-600 flex items-center justify-center text-white text-sm font-bold">
+              <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-full landing-accent-bg flex items-center justify-center text-white text-sm font-bold">
                 {user?.name?.[0] ?? "U"}
               </div>
             )}
           </button>
 
           {menuOpen && (
-            <div className="absolute right-0 top-12 mt-1 w-52 rounded-2xl border border-slate-200 bg-white shadow-lg shadow-slate-200/60 text-sm z-20">
+            <div className="absolute right-0 top-full mt-1 w-48 sm:w-52 max-w-[calc(100vw-2rem)] rounded-2xl border border-slate-200 bg-white shadow-lg shadow-slate-200/60 text-sm z-20">
               <div className="px-3 py-2 border-b border-slate-100">
                 <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide">
                   Account
