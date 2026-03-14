@@ -1,16 +1,21 @@
 import { NextResponse } from "next/server";
 import Stripe from "stripe";
 import { auth } from "@/lib/auth";
+import { prisma } from "@/lib/prisma";
 
 export const runtime = "nodejs";
 
-async function getOrCreateCustomer(stripe: Stripe, email: string, userId: string) {
+async function getOrCreateCustomer(stripe: Stripe, email: string, userId: string): Promise<string> {
   const existing = await stripe.customers.list({
     email,
     limit: 1,
   });
   if (existing.data.length > 0) {
-    return existing.data[0].id;
+    const customer = existing.data[0];
+    if (!customer.metadata?.userId) {
+      await stripe.customers.update(customer.id, { metadata: { ...customer.metadata, userId } });
+    }
+    return customer.id;
   }
 
   const created = await stripe.customers.create({
@@ -71,9 +76,6 @@ export async function POST(request: Request) {
     const paymentIntent = latestInvoice?.payment_intent;
 
     if (paymentIntent && paymentIntent.status === "requires_action") {
-      // For strong customer authentication you would need to handle this
-      // client-side with stripe.confirmCardPayment. For now we surface an
-      // error message so the user can complete the flow in Stripe instead.
       return NextResponse.json(
         {
           status: "requires_action",
@@ -83,6 +85,11 @@ export async function POST(request: Request) {
         { status: 400 }
       );
     }
+
+    await prisma.user.update({
+      where: { id: session.user.id },
+      data: { plan: "pro" },
+    });
 
     return NextResponse.json({ status: "active" });
   } catch (err: any) {

@@ -4,6 +4,7 @@ import { extractInvoiceData } from "@/lib/openai";
 import { syncToGoogle } from "@/lib/google";
 import { prisma } from "@/lib/prisma";
 import { getValidGoogleAccessToken } from "@/lib/google-auth";
+import { ensureFreeCreditsReset } from "@/lib/credits";
 
 // Disable Next.js body parser to handle raw FormData
 export const runtime = "nodejs";
@@ -17,17 +18,34 @@ export async function POST(request: Request) {
 
     const userId = session.user.id;
 
-    // 2. Check credits
+    // 2. Load user and apply plan logic
     const user = await prisma.user.findUnique({
         where: { id: userId },
-        select: { credits: true, sheetId: true, sheetName: true, sheetMapping: true, filenameMapping: true, driveFolderId: true },
+        select: {
+            plan: true,
+            credits: true,
+            sheetId: true,
+            sheetName: true,
+            sheetMapping: true,
+            filenameMapping: true,
+            driveFolderId: true,
+        },
     });
 
-    if (!user || user.credits <= 0) {
-        return NextResponse.json(
-            { error: "No credits remaining. Please upgrade to Pro." },
-            { status: 402 }
-        );
+    if (!user) {
+        return NextResponse.json({ error: "User not found." }, { status: 401 });
+    }
+
+    const isPro = user.plan === "pro";
+
+    if (!isPro) {
+        const creditsAfterReset = await ensureFreeCreditsReset(userId);
+        if (creditsAfterReset <= 0) {
+            return NextResponse.json(
+                { error: "No credits remaining this month. Resets next month or upgrade to Pro for unlimited." },
+                { status: 402 }
+            );
+        }
     }
 
     const accessToken = await getValidGoogleAccessToken(userId);
@@ -180,13 +198,15 @@ export async function POST(request: Request) {
         );
     }
 
-    // 8. Deduct credit and log
-    await prisma.$transaction([
-        prisma.user.update({
-            where: { id: userId },
-            data: { credits: { decrement: 1 } },
-        }),
-        prisma.processingLog.create({
+    // 8. Deduct credit (free plan only) and log
+    await prisma.$transaction(async (tx) => {
+        if (!isPro) {
+            await tx.user.update({
+                where: { id: userId },
+                data: { credits: { decrement: 1 } },
+            });
+        }
+        await tx.processingLog.create({
             data: {
                 userId,
                 filename,
@@ -198,8 +218,8 @@ export async function POST(request: Request) {
                 sheetRow,
                 status,
             },
-        }),
-    ]);
+        });
+    });
 
     // 8. Return result
     return NextResponse.json({

@@ -10,6 +10,7 @@ declare module "next-auth" {
       email?: string | null;
       image?: string | null;
       credits?: number;
+      plan?: string;
       sheetId?: string | null;
       sheetName?: string | null;
       sheetMapping?: any | null;
@@ -28,6 +29,7 @@ declare module "next-auth/jwt" {
     refreshToken?: string;
     expiresAt?: number;
     credits?: number;
+    plan?: string;
     sheetId?: string | null;
     sheetName?: string | null;
     sheetMapping?: any | null;

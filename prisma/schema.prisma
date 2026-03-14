@@ -38,24 +38,26 @@ model Session {
 }
 
 model User {
-  id            String    @id @default(cuid())
-  name          String?
-  email         String?   @unique
-  emailVerified DateTime?
-  image         String?
-  credits       Int       @default(10)
-  sheetId       String?
-  sheetName     String?
-  sheetMapping  Json?
-  filenameMapping Json?
-  sheetProfiles Json?
+  id                 String    @id @default(cuid())
+  name               String?
+  email              String?   @unique
+  emailVerified      DateTime?
+  image              String?
+  credits            Int       @default(10)
+  plan               String    @default("free") // "free" | "pro"
+  lastCreditsReset   DateTime? // last time free-plan credits were reset to 10
+  sheetId            String?
+  sheetName          String?
+  sheetMapping       Json?
+  filenameMapping    Json?
+  sheetProfiles      Json?
   activeSheetProfileId String?
-  driveFolderId String?
-  accounts      Account[]
-  sessions      Session[]
-  logs          ProcessingLog[]
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
+  driveFolderId      String?
+  accounts           Account[]
+  sessions           Session[]
+  logs               ProcessingLog[]
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
 }
 
 model VerificationToken {

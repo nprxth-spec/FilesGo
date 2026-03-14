@@ -53,7 +53,8 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         const dbUser = await prisma.user.findUnique({
           where: { id: token.userId as string },
           select: { 
-            credits: true, 
+            credits: true,
+            plan: true,
             sheetId: true,
             sheetName: true,
             sheetMapping: true,
@@ -70,6 +71,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
 
         if (dbUser) {
           token.credits = dbUser.credits;
+          (token as any).plan = dbUser.plan;
           token.sheetId = dbUser.sheetId;
           token.sheetName = dbUser.sheetName;
           token.sheetMapping = dbUser.sheetMapping;
@@ -136,6 +138,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         session.user.id = token.userId as string;
         (session as any).accessToken = token.accessToken;
         (session.user as any).credits = token.credits;
+        (session.user as any).plan = (token as any).plan;
         (session.user as any).sheetId = token.sheetId;
         (session.user as any).sheetName = token.sheetName;
         (session.user as any).sheetMapping = token.sheetMapping;

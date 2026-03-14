@@ -14,9 +14,11 @@ type HeaderUser = {
 export function DashboardHeader({
   user,
   credits,
+  plan = "free",
 }: {
   user: HeaderUser | null | undefined;
   credits: number;
+  plan?: string;
 }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [showSignOutConfirm, setShowSignOutConfirm] = useState(false);
@@ -52,7 +54,7 @@ export function DashboardHeader({
           <div className="flex items-center gap-1.5 sm:gap-2 px-2 sm:px-3 py-1 sm:py-1.5 rounded-full bg-teal-50 border border-teal-100">
             <Zap className="w-3.5 h-3.5 text-teal-600 shrink-0" />
             <span className="text-xs sm:text-sm font-semibold text-teal-700">
-              {credits}
+              {plan === "pro" ? "Unlimited" : credits}
             </span>
             <span className="hidden sm:inline text-xs text-teal-500">credits</span>
           </div>

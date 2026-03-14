@@ -32,7 +32,8 @@ export default function BillingCompositePage() {
   const [showAddCardFirstHint, setShowAddCardFirstHint] = useState(false);
 
   const credits = (session?.user as any)?.credits ?? 0;
-  const isPro = credits > 100;
+  const plan = (session?.user as any)?.plan ?? "free";
+  const isPro = plan === "pro";
 
   const handleDeleteAccount = async () => {
     if (deleting) return;
@@ -204,7 +205,7 @@ export default function BillingCompositePage() {
                   Credits
                 </p>
                 <p className="mt-1 text-2xl font-semibold text-slate-900">
-                  {credits}
+                  {isPro ? "Unlimited" : credits}
                 </p>
               </div>
             </div>
@@ -226,8 +227,8 @@ export default function BillingCompositePage() {
                   </span>
                 </div>
                 <ul className="text-xs text-slate-600 space-y-1">
+                  <li>• 10 credits per month (resets monthly)</li>
                   <li>• Basic invoice uploads</li>
-                  <li>• Limited monthly credits</li>
                 </ul>
               </div>
 
@@ -261,9 +262,9 @@ export default function BillingCompositePage() {
                   </span>
                 </div>
                 <ul className="text-xs text-slate-600 space-y-1">
-                  <li>• Higher or unlimited credits</li>
+                  <li>• Unlimited credits</li>
                   <li>• Priority processing</li>
-                  <li>• Better support for teams</li>
+                  <li>• Renews monthly; reverts to Free if not renewed</li>
                 </ul>
                 {!isPro && (
                   <div className="mt-1 inline-flex items-center gap-1 text-xs font-semibold text-slate-900">

@@ -1,0 +1,43 @@
+"use client";
+
+import { useRouter } from "next/navigation";
+import { Calendar, ChevronDown } from "lucide-react";
+
+const RANGE_OPTIONS: { value: string; label: string }[] = [
+  { value: "all", label: "All time" },
+  { value: "today", label: "Today" },
+  { value: "yesterday", label: "Yesterday" },
+  { value: "this_week", label: "This week" },
+  { value: "this_month", label: "This month" },
+  { value: "last_month", label: "Last month" },
+  { value: "this_year", label: "This year" },
+];
+
+export default function LogsRangeSelect({ currentRange }: { currentRange: string }) {
+  const router = useRouter();
+
+  return (
+    <div className="flex items-center gap-2">
+      <Calendar className="w-4 h-4 text-slate-500 shrink-0" />
+      <span className="text-sm font-medium text-slate-600">Date (processed):</span>
+      <div className="relative">
+        <select
+          value={currentRange}
+          onChange={(e) => {
+            const range = e.target.value;
+            const url = range === "all" ? "/admin/logs" : `/admin/logs?range=${range}`;
+            router.push(url);
+          }}
+          className="appearance-none pl-3 pr-8 py-2 rounded-lg border border-slate-200 bg-white text-slate-800 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-slate-400 min-w-[140px] cursor-pointer"
+        >
+          {RANGE_OPTIONS.map((opt) => (
+            <option key={opt.value} value={opt.value}>
+              {opt.label}
+            </option>
+          ))}
+        </select>
+        <ChevronDown className="absolute right-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
+      </div>
+    </div>
+  );
+}
