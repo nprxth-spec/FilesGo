@@ -249,6 +249,14 @@ export default function IntegrationsPage() {
             </div>
 
             <div className="bg-white rounded-3xl border border-slate-100 shadow-lg shadow-slate-200/60 p-6 space-y-6">
+                {saved && (
+                    <div className="mb-3 flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-800">
+                        <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-emerald-100 text-[10px] font-bold">
+                            ✓
+                        </span>
+                        <span>Google Sheets connection and column mapping saved successfully</span>
+                    </div>
+                )}
                 <div className="flex items-center gap-3 pb-2 border-b border-slate-100">
                     <div className="w-10 h-10 rounded-2xl bg-green-50 flex items-center justify-center">
                         <svg viewBox="0 0 24 24" className="w-5 h-5" fill="none">
