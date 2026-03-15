@@ -1,3 +1,4 @@
+import { revalidateTag } from "next/cache";
 import { auth } from "@/lib/auth";
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
@@ -100,6 +101,8 @@ export async function POST(request: Request) {
       { profileCount: profiles.length, activeId: activeProfile?.id ?? null },
       getClientIp(request)
     );
+
+    revalidateTag(`user-sheet-${session.user.id}`, "max");
 
     return NextResponse.json({ success: true });
   } catch (err: any) {

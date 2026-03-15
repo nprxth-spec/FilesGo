@@ -33,6 +33,8 @@ export default function DashboardPage() {
         results,
         stage,
         showBatchComplete,
+        duplicateAlertFilename,
+        dismissDuplicateAlert,
         getRootProps,
         getInputProps,
         isDragActive,
@@ -51,6 +53,7 @@ export default function DashboardPage() {
     const modeMenuRef = useRef<HTMLDivElement | null>(null);
     const [folderError, setFolderError] = useState("");
     const [driveFolderLabel, setDriveFolderLabel] = useState("");
+    const [spreadsheetTitle, setSpreadsheetTitle] = useState<string | null>(null); // ชื่อไฟล์สเปรดชีต
 
     const PICKER_ROOT_FOLDER_ID = "11-naB49cPhno_HpKcTbrmYPhNz_R8oJk";
 
@@ -123,6 +126,30 @@ export default function DashboardPage() {
         };
         void load();
     }, [session, modeInitialized, driveFolderId, driveFolderLabel]);
+
+    // Load spreadsheet file name (ชื่อไฟล์) when user has sheetId
+    useEffect(() => {
+        const sheetId = (session?.user as any)?.sheetId as string | undefined;
+        if (!sheetId) {
+            setSpreadsheetTitle(null);
+            return;
+        }
+        let cancelled = false;
+        (async () => {
+            try {
+                const res = await fetch(`/api/google/sheets/title?sheetId=${encodeURIComponent(sheetId)}`);
+                const data = await res.json();
+                if (!cancelled && res.ok && data?.data?.title !== undefined) {
+                    setSpreadsheetTitle(data.data.title as string);
+                } else if (!cancelled) {
+                    setSpreadsheetTitle("");
+                }
+            } catch {
+                if (!cancelled) setSpreadsheetTitle("");
+            }
+        })();
+        return () => { cancelled = true; };
+    }, [session?.user ? (session.user as any).sheetId : null]);
 
     const loadGoogleApiScript = () =>
         new Promise<void>((resolve, reject) => {
@@ -280,6 +307,22 @@ export default function DashboardPage() {
 
     return (
         <div className="max-w-4xl mx-auto w-full min-w-0">
+            {duplicateAlertFilename && (
+                <div className="mb-4 flex items-center gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-amber-800">
+                    <AlertCircle className="w-5 h-5 shrink-0 text-amber-600" />
+                    <p className="flex-1 text-sm font-medium">
+                        ไฟล์ <span className="font-semibold">{duplicateAlertFilename}</span> ซ้ำแล้ว — ประมวลผลไปแล้ว ไม่มีการอัปโหลดซ้ำ
+                    </p>
+                    <button
+                        type="button"
+                        onClick={dismissDuplicateAlert}
+                        className="shrink-0 rounded-lg p-1.5 text-amber-600 hover:bg-amber-100 transition-colors cursor-pointer"
+                        aria-label="ปิด"
+                    >
+                        <X className="w-4 h-4" />
+                    </button>
+                </div>
+            )}
             <div className="mb-6 sm:mb-8 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
                 <div className="min-w-0">
                     <h1 className="text-xl sm:text-2xl font-bold text-slate-900 mb-1">Batch Upload Invoices</h1>
@@ -399,6 +442,28 @@ export default function DashboardPage() {
                             ) : (
                                 <span className="text-slate-400">Not set</span>
                             )}
+                        </p>
+                        <p className="text-xs text-slate-500 mt-1">
+                            Current target sheet:&nbsp;
+                            <span className="font-medium text-slate-700">
+                                {(session?.user as any)?.sheetId ? (
+                                    <>
+                                        {/* ชื่อไฟล์ = ชื่อสเปรดชีต (เอกสาร), ชื่อชีต = ชื่อแท็บ */}
+                                        {spreadsheetTitle !== null ? spreadsheetTitle || "—" : "…"}
+                                        {" > "}
+                                        <a
+                                            href={`https://docs.google.com/spreadsheets/d/${(session?.user as any).sheetId}`}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="text-teal-600 hover:text-teal-800 underline"
+                                        >
+                                            {(session?.user as any)?.sheetName ?? (session?.user as any).sheetId}
+                                        </a>
+                                    </>
+                                ) : (
+                                    "Not set"
+                                )}
+                            </span>
                         </p>
                     </div>
                 </div>

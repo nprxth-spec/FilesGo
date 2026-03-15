@@ -114,18 +114,18 @@ export default function NamingRulesPage() {
           placeholder={`5991=WF-0004-1;\n5821=WF-0004-2;\n9649=WF-0004-9;`}
         />
 
-        <div className="flex items-center justify-between pt-2">
-          <p className="text-xs text-slate-400">
+        <div className="flex flex-wrap items-center gap-3 pt-2">
+          <p className="text-xs text-slate-400 min-w-0 flex-1">
             When an invoice has card last 4 digits <span className="font-mono">5991</span>, the uploaded file will be named
             <span className="font-mono"> WF-0004-1 &lt;original-filename&gt;</span>.
           </p>
           <button
             onClick={handleSave}
             disabled={saving || loading}
-            className="flex items-center gap-2 px-5 py-2.5 rounded-xl landing-accent-bg text-white text-sm font-medium hover:opacity-95 disabled:opacity-50 transition-colors shadow-sm cursor-pointer disabled:cursor-not-allowed"
+            className="flex items-center gap-2 px-5 py-2.5 rounded-xl landing-accent-bg text-white text-sm font-medium hover:opacity-95 disabled:opacity-50 transition-colors shadow-sm cursor-pointer disabled:cursor-not-allowed shrink-0 whitespace-nowrap ml-auto"
           >
-            {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
-            {saved ? "Saved" : "Save Rules"}
+            {saving ? <Loader2 className="w-4 h-4 animate-spin shrink-0" /> : <Save className="w-4 h-4 shrink-0" />}
+            <span>{saved ? "Saved" : "Save Rules"}</span>
           </button>
         </div>
       </div>

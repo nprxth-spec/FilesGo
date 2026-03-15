@@ -1,3 +1,4 @@
+import { revalidateTag } from "next/cache";
 import { auth } from "@/lib/auth";
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
@@ -54,6 +55,8 @@ export async function POST(request: Request) {
       driveFolderId ? { driveFolderId } : undefined,
       getClientIp(request)
     );
+
+    revalidateTag(`user-folder-${session.user.id}`, "max");
 
     return NextResponse.json({ success: true, data: { driveFolderId } });
   } catch (err: any) {

@@ -101,19 +101,22 @@ export async function POST(request: Request) {
     const originalFilename = file.name;
     let filename = originalFilename;
 
-    // Prevent duplicate successful uploads
+    // Prevent duplicate successful uploads (match by original name; log may store transformed filename)
     const existingLog = await prisma.processingLog.findFirst({
         where: {
             userId,
-            filename,
             status: "success",
+            OR: [
+                { originalFilename: originalFilename },
+                { originalFilename: null, filename: originalFilename },
+            ],
         },
-        select: { id: true }
+        select: { id: true },
     });
 
     if (existingLog) {
         return NextResponse.json(
-            { error: `File "${filename}" has already been processed.` },
+            { error: `File "${originalFilename}" has already been processed.` },
             { status: 409 }
         );
     }
@@ -188,7 +191,8 @@ export async function POST(request: Request) {
         await prisma.processingLog.create({
             data: {
                 userId,
-                filename,
+                filename: originalFilename,
+                originalFilename,
                 status: "error",
             },
         });
@@ -210,6 +214,7 @@ export async function POST(request: Request) {
             data: {
                 userId,
                 filename,
+                originalFilename,
                 invoiceDate: invoiceData?.date,
                 cardLast4: invoiceData?.card_last_4,
                 amount: invoiceData?.amount,

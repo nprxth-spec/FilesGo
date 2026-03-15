@@ -32,6 +32,9 @@ type DashboardUploadContextValue = {
     results: ResultItem[];
     stage: UploadStage;
     showBatchComplete: boolean;
+    /** Filename when last upload was rejected as duplicate; show alert until dismissed. */
+    duplicateAlertFilename: string | null;
+    dismissDuplicateAlert: () => void;
     onDrop: (acceptedFiles: File[]) => void;
     resetState: () => void;
     acknowledgeBatchComplete: () => void;
@@ -62,6 +65,9 @@ export function DashboardUploadProvider({ children }: { children: React.ReactNod
     const [results, setResults] = useState<ResultItem[]>([]);
     const [stage, setStage] = useState<UploadStage>("idle");
     const [showBatchComplete, setShowBatchComplete] = useState(false);
+    const [duplicateAlertFilename, setDuplicateAlertFilename] = useState<string | null>(null);
+
+    const dismissDuplicateAlert = useCallback(() => setDuplicateAlertFilename(null), []);
 
     const isProcessingRef = useRef(false);
     const deferredSessionUpdateRef = useRef(false);
@@ -111,7 +117,12 @@ export function DashboardUploadProvider({ children }: { children: React.ReactNod
                 const res = await fetch("/api/upload", { method: "POST", body: formData });
                 const data = await res.json();
 
-                if (!res.ok) throw new Error(data.error ?? "Processing failed");
+                if (!res.ok) {
+                    if (res.status === 409) {
+                        setDuplicateAlertFilename(file.name);
+                    }
+                    throw new Error(data.error ?? "Processing failed");
+                }
 
                 const newResult = data.data as InvoiceResult;
                 const updatedResults = [...currentResults, newResult];
@@ -131,6 +142,7 @@ export function DashboardUploadProvider({ children }: { children: React.ReactNod
     const onDrop = useCallback(
         (acceptedFiles: File[]) => {
             if (acceptedFiles.length > 0) {
+                setDuplicateAlertFilename(null);
                 setQueue(acceptedFiles);
                 setResults([]);
                 setCurrentIndex(-1);
@@ -148,6 +160,7 @@ export function DashboardUploadProvider({ children }: { children: React.ReactNod
 
     const resetState = useCallback(() => {
         isProcessingRef.current = false;
+        setDuplicateAlertFilename(null);
         setStage("idle");
         setResults([]);
         setQueue([]);
@@ -179,6 +192,8 @@ export function DashboardUploadProvider({ children }: { children: React.ReactNod
         results,
         stage,
         showBatchComplete,
+        duplicateAlertFilename,
+        dismissDuplicateAlert,
         onDrop,
         resetState,
         acknowledgeBatchComplete,

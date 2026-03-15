@@ -53,6 +53,22 @@ export interface SheetMapping {
 }
 
 /**
+ * Fetch the spreadsheet document title (file name) by ID.
+ */
+export async function getSpreadsheetTitle(
+    sheetId: string,
+    accessToken: string
+): Promise<string> {
+    const auth = getOAuth2Client(accessToken);
+    const sheets = google.sheets({ version: "v4", auth });
+    const res = await sheets.spreadsheets.get({
+        spreadsheetId: sheetId,
+        fields: "properties/title",
+    });
+    return (res.data.properties?.title as string) ?? "";
+}
+
+/**
  * Fetch available tabs (sheets) for a given Google Spreadsheet ID.
  */
 export async function getSpreadsheetTabs(

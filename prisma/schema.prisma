@@ -70,11 +70,12 @@ model VerificationToken {
 }
 
 model ProcessingLog {
-  id          String   @id @default(cuid())
-  userId      String
-  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  filename    String
-  invoiceDate String?
+  id               String   @id @default(cuid())
+  userId           String
+  user             User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  filename         String   // display name (may include mapping + billed_to)
+  originalFilename String?  // name as uploaded; used for duplicate detection
+  invoiceDate      String?
   cardLast4   String?
   amount      Float?
   currency    String?
@@ -84,6 +85,7 @@ model ProcessingLog {
   createdAt   DateTime @default(now())
 
   @@index([userId])
+  @@index([userId, originalFilename, status])
 }
 
 model AuditLog {
