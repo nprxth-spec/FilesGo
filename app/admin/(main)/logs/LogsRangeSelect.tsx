@@ -13,19 +13,27 @@ const RANGE_OPTIONS: { value: string; label: string }[] = [
   { value: "this_year", label: "This year" },
 ];
 
-export default function LogsRangeSelect({ currentRange }: { currentRange: string }) {
+export default function LogsRangeSelect({
+  basePath,
+  currentRange,
+  dateLabel = "Date:",
+}: {
+  basePath: string;
+  currentRange: string;
+  dateLabel?: string;
+}) {
   const router = useRouter();
 
   return (
     <div className="flex items-center gap-2">
       <Calendar className="w-4 h-4 text-slate-500 shrink-0" />
-      <span className="text-sm font-medium text-slate-600">Date (processed):</span>
+      <span className="text-sm font-medium text-slate-600">{dateLabel}</span>
       <div className="relative">
         <select
           value={currentRange}
           onChange={(e) => {
             const range = e.target.value;
-            const url = range === "all" ? "/admin/logs" : `/admin/logs?range=${range}`;
+            const url = range === "all" ? basePath : `${basePath}?range=${range}`;
             router.push(url);
           }}
           className="appearance-none pl-3 pr-8 py-2 rounded-lg border border-slate-200 bg-white text-slate-800 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-slate-400 min-w-[140px] cursor-pointer"

@@ -1,7 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import Link from "next/link";
 import { ChevronLeft, ChevronRight } from "lucide-react";
-import LogsRangeSelect from "./LogsRangeSelect";
+import LogsRangeSelect from "../logs/LogsRangeSelect";
 
 const PAGE_SIZE = 50;
 
@@ -58,7 +58,15 @@ function buildQuery(page?: number, range?: string): string {
   return s ? `?${s}` : "";
 }
 
-export default async function AdminLogsPage({
+const AUDIT_TYPE_LABELS: Record<string, string> = {
+  login: "ล็อกอิน",
+  config_drive: "Drive",
+  config_sheet: "Google Sheet",
+  config_naming: "กฎชื่อไฟล์",
+  config_plan: "แพลน",
+};
+
+export default async function AdminAuditLogsPage({
   searchParams,
 }: {
   searchParams: Promise<{ page?: string; range?: string }>;
@@ -82,8 +90,11 @@ export default async function AdminLogsPage({
     where.createdAt = { gte: from, lte: to };
   }
 
-  const [logs, total] = await Promise.all([
-    prisma.processingLog.findMany({
+  const rangeLabel =
+    range === "all" ? "All time" : range === "today" ? "Today" : range === "yesterday" ? "Yesterday" : range === "this_week" ? "This week" : range === "this_month" ? "This month" : range === "last_month" ? "Last month" : range === "this_year" ? "This year" : "All time";
+
+  const [auditLogs, auditTotal] = await Promise.all([
+    prisma.auditLog.findMany({
       where,
       orderBy: { createdAt: "desc" },
       take: PAGE_SIZE,
@@ -92,38 +103,33 @@ export default async function AdminLogsPage({
         user: { select: { id: true, email: true, name: true } },
       },
     }),
-    prisma.processingLog.count({ where }),
+    prisma.auditLog.count({ where }),
   ]);
-
-  const totalPages = Math.ceil(total / PAGE_SIZE) || 1;
-  const rangeLabel =
-    (range === "all" ? "All time" : range === "today" ? "Today" : range === "yesterday" ? "Yesterday" : range === "this_week" ? "This week" : range === "this_month" ? "This month" : range === "last_month" ? "Last month" : range === "this_year" ? "This year" : "All time");
+  const auditTotalPages = Math.ceil(auditTotal / PAGE_SIZE) || 1;
 
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <h1 className="text-xl font-bold text-slate-900">ประมวลผลใบแจ้งหนี้</h1>
-        <LogsRangeSelect basePath="/admin/logs" currentRange={range} dateLabel="Date (processed):" />
+        <h1 className="text-xl font-bold text-slate-900">การล็อกอิน / แก้ไข config</h1>
+        <LogsRangeSelect basePath="/admin/audit-logs" currentRange={range} dateLabel="Date:" />
       </div>
 
-      <p className="text-sm text-slate-500">{total} รายการในระยะนี้</p>
+      <p className="text-sm text-slate-500">{auditTotal} รายการในระยะนี้</p>
 
       <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
         <div className="overflow-x-auto">
           <table className="min-w-full text-sm">
             <thead>
               <tr className="border-b border-slate-200 bg-slate-50">
-                <th className="text-left px-4 py-2 font-medium text-slate-600">Processed</th>
+                <th className="text-left px-4 py-2 font-medium text-slate-600">เวลา</th>
                 <th className="text-left px-4 py-2 font-medium text-slate-600">User</th>
-                <th className="text-left px-4 py-2 font-medium text-slate-600">Filename</th>
-                <th className="text-left px-4 py-2 font-medium text-slate-600">Status</th>
-                <th className="text-left px-4 py-2 font-medium text-slate-600">Invoice Date</th>
-                <th className="text-left px-4 py-2 font-medium text-slate-600">Amount</th>
-                <th className="text-left px-4 py-2 font-medium text-slate-600">Drive</th>
+                <th className="text-left px-4 py-2 font-medium text-slate-600">IP</th>
+                <th className="text-left px-4 py-2 font-medium text-slate-600">ประเภท</th>
+                <th className="text-left px-4 py-2 font-medium text-slate-600">รายละเอียด</th>
               </tr>
             </thead>
             <tbody>
-              {logs.map((log) => (
+              {auditLogs.map((log) => (
                 <tr key={log.id} className="border-b border-slate-100">
                   <td className="px-4 py-2 text-slate-600 whitespace-nowrap">
                     {new Date(log.createdAt).toLocaleString(undefined, {
@@ -131,40 +137,21 @@ export default async function AdminLogsPage({
                       timeStyle: "short",
                     })}
                   </td>
-                  <td className="px-4 py-2">
-                    <span className="text-slate-700">{log.user?.email ?? log.userId}</span>
+                  <td className="px-4 py-2 text-slate-700">
+                    {log.user?.email ?? log.userId}
                   </td>
-                  <td className="px-4 py-2 text-slate-700 truncate max-w-[200px]" title={log.filename}>
-                    {log.filename}
+                  <td className="px-4 py-2 text-slate-600 font-mono text-xs">
+                    {(log as { ip?: string | null }).ip ??
+                      (log.metadata as { ip?: string } | null)?.ip ??
+                      "—"}
                   </td>
                   <td className="px-4 py-2">
-                    <span
-                      className={
-                        log.status === "success"
-                          ? "text-emerald-600 font-medium"
-                          : "text-amber-600"
-                      }
-                    >
-                      {log.status}
+                    <span className="font-medium text-slate-700">
+                      {AUDIT_TYPE_LABELS[log.type] ?? log.type}
                     </span>
                   </td>
-                  <td className="px-4 py-2 text-slate-600">{log.invoiceDate ?? "—"}</td>
-                  <td className="px-4 py-2 text-slate-600">
-                    {log.amount != null ? `${log.amount} ${log.currency ?? ""}` : "—"}
-                  </td>
-                  <td className="px-4 py-2">
-                    {log.driveLink ? (
-                      <a
-                        href={log.driveLink}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-teal-600 hover:underline"
-                      >
-                        Link
-                      </a>
-                    ) : (
-                      "—"
-                    )}
+                  <td className="px-4 py-2 text-slate-600 max-w-[320px] truncate" title={log.description ?? undefined}>
+                    {log.description ?? "—"}
                   </td>
                 </tr>
               ))}
@@ -172,24 +159,24 @@ export default async function AdminLogsPage({
           </table>
         </div>
 
-        {totalPages > 1 && (
+        {auditTotalPages > 1 && (
           <div className="flex items-center justify-between px-4 py-3 border-t border-slate-100">
             <p className="text-xs text-slate-500">
-              Page {page} of {totalPages}
+              Page {page} of {auditTotalPages}
               {range !== "all" && ` · ${rangeLabel}`}
             </p>
             <div className="flex gap-2">
               {page > 1 && (
                 <Link
-                  href={`/admin/logs${buildQuery(page - 1, range)}`}
+                  href={`/admin/audit-logs${buildQuery(page - 1, range)}`}
                   className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg border border-slate-200 text-slate-700 hover:bg-slate-50 text-sm"
                 >
                   <ChevronLeft className="w-4 h-4" /> Previous
                 </Link>
               )}
-              {page < totalPages && (
+              {page < auditTotalPages && (
                 <Link
-                  href={`/admin/logs${buildQuery(page + 1, range)}`}
+                  href={`/admin/audit-logs${buildQuery(page + 1, range)}`}
                   className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg border border-slate-200 text-slate-700 hover:bg-slate-50 text-sm"
                 >
                   Next <ChevronRight className="w-4 h-4" />

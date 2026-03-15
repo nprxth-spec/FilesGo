@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import Stripe from "stripe";
 import { prisma } from "@/lib/prisma";
+import { createAuditLog, getClientIp } from "@/lib/audit-log";
 
 export const runtime = "nodejs";
 
@@ -80,6 +81,13 @@ export async function POST(request: Request) {
       where: { id: userId },
       data: { plan },
     });
+    await createAuditLog(
+      userId,
+      "config_plan",
+      plan === "pro" ? "อัปเกรดเป็น Pro (Stripe)" : "เปลี่ยนเป็นแพลน Free",
+      { plan },
+      getClientIp(request)
+    );
   } catch (e) {
     console.error("Webhook: failed to update user plan:", e);
     return NextResponse.json({ error: "Database update failed" }, { status: 500 });

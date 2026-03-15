@@ -1,6 +1,7 @@
 import { auth } from "@/lib/auth";
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { createAuditLog, getClientIp } from "@/lib/audit-log";
 
 export async function GET() {
   const session = await auth();
@@ -45,6 +46,13 @@ export async function POST(request: Request) {
     where: { id: session.user.id },
     data: { filenameMapping: cleaned },
   });
+  await createAuditLog(
+    session.user.id,
+    "config_naming",
+    "แก้ไขกฎชื่อไฟล์ (last 4 digits → prefix)",
+    { ruleCount: Object.keys(cleaned).length },
+    getClientIp(request)
+  );
 
   return NextResponse.json({ success: true });
 }

@@ -1,6 +1,7 @@
 import { auth } from "@/lib/auth";
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { createAuditLog, getClientIp } from "@/lib/audit-log";
 
 type SheetProfile = {
   id: string;
@@ -92,6 +93,13 @@ export async function POST(request: Request) {
         sheetMapping: activeProfile ? activeProfile.sheetMapping ?? null : null,
       },
     });
+    await createAuditLog(
+      session.user.id,
+      "config_sheet",
+      "แก้ไขการเชื่อมต่อ Google Sheet",
+      { profileCount: profiles.length, activeId: activeProfile?.id ?? null },
+      getClientIp(request)
+    );
 
     return NextResponse.json({ success: true });
   } catch (err: any) {

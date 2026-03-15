@@ -56,6 +56,7 @@ model User {
   accounts           Account[]
   sessions           Session[]
   logs               ProcessingLog[]
+  auditLogs          AuditLog[]
   createdAt          DateTime  @default(now())
   updatedAt          DateTime  @updatedAt
 }
@@ -83,4 +84,19 @@ model ProcessingLog {
   createdAt   DateTime @default(now())
 
   @@index([userId])
+}
+
+model AuditLog {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type        String   // "login" | "config_drive" | "config_sheet" | "config_naming" | "config_plan"
+  description String?
+  metadata    Json?    // optional extra (e.g. what changed)
+  ip          String?  // client IP when available
+  createdAt   DateTime @default(now())
+
+  @@index([userId])
+  @@index([createdAt])
+  @@index([type])
 }

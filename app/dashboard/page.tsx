@@ -1,8 +1,7 @@
 "use client";
 
-import { useState, useCallback, useEffect, useRef } from "react";
-import { useDropzone } from "react-dropzone";
-import { useSession } from "next-auth/react";
+import { useState, useEffect, useRef } from "react";
+import { useSession, signOut } from "next-auth/react";
 import {
     Upload,
     FileText,
@@ -16,39 +15,35 @@ import {
     X,
     ChevronDown,
 } from "lucide-react";
+import { useDashboardUpload, type UploadStage } from "@/components/DashboardUploadContext";
 
-type Stage = "idle" | "uploading" | "extracting" | "drive" | "sheets" | "done" | "error";
-
-const stages: { key: Stage; label: string; icon: any }[] = [
+const stages: { key: UploadStage; label: string; icon: any }[] = [
     { key: "uploading", label: "Uploading", icon: CloudUpload },
     { key: "extracting", label: "AI Extracting", icon: Sparkles },
     { key: "drive", label: "Saving to Drive", icon: HardDrive },
     { key: "sheets", label: "Updating Sheet", icon: Sheet },
 ];
 
-const stageOrder: Stage[] = ["uploading", "extracting", "drive", "sheets", "done"];
-
-interface InvoiceResult {
-    filename: string;
-    date: string;
-    card_last_4: string;
-    amount: number;
-    currency: string;
-    driveLink: string;
-    billed_to: string;
-}
-
 export default function DashboardPage() {
-    const { data: session, update } = useSession();
-    
-    // Multi-file state
-    const [queue, setQueue] = useState<File[]>([]);
-    const [currentIndex, setCurrentIndex] = useState<number>(-1);
-    const [results, setResults] = useState<(InvoiceResult | { filename: string, error: string })[]>([]);
-    const [stage, setStage] = useState<Stage>("idle");
-    const [showBatchComplete, setShowBatchComplete] = useState(false);
+    const { data: session } = useSession();
+    const upload = useDashboardUpload();
+    const {
+        queue,
+        currentIndex,
+        results,
+        stage,
+        showBatchComplete,
+        getRootProps,
+        getInputProps,
+        isDragActive,
+        resetState,
+        acknowledgeBatchComplete,
+        requestSessionUpdate,
+        isProcessing,
+        currentFile,
+    } = upload;
 
-    // Drive folder selection
+    // Drive folder selection (local state; upload progress lives in context)
     const [driveFolderId, setDriveFolderId] = useState("");
     const [driveFolderMode, setDriveFolderMode] = useState<"auto" | "custom">("auto");
     const [modeInitialized, setModeInitialized] = useState(false);
@@ -57,7 +52,6 @@ export default function DashboardPage() {
     const [folderError, setFolderError] = useState("");
     const [driveFolderLabel, setDriveFolderLabel] = useState("");
 
-    // Optional: root folder for picker start location
     const PICKER_ROOT_FOLDER_ID = "11-naB49cPhno_HpKcTbrmYPhNz_R8oJk";
 
     // Close mode dropdown when clicking outside
@@ -238,7 +232,7 @@ export default function DashboardPage() {
                                     if (!res.ok) {
                                         setFolderError(data.error ?? "Failed to save folder");
                                     } else {
-                                        await update();
+                                        await requestSessionUpdate();
                                         // Refresh human-readable path after saving
                                         try {
                                             const metaRes = await fetch(
@@ -271,99 +265,18 @@ export default function DashboardPage() {
         }
     };
 
-    const processNext = useCallback(async (
-        files: File[], 
-        index: number, 
-        currentResults: (InvoiceResult | { filename: string, error: string })[]
-    ) => {
-        if (index >= files.length) {
-            // All files processed
-            setCurrentIndex(-1);
-            setStage("done");
-            setShowBatchComplete(true);
-            return;
-        }
 
-        const file = files[index];
-        setCurrentIndex(index);
-        setStage("uploading");
 
-        try {
-            const formData = new FormData();
-            formData.append("file", file);
-            const sheetId = (session?.user as any)?.sheetId ?? "";
-            if (sheetId) formData.append("sheetId", sheetId);
-
-            // Simulate stage animation for UX
-            setTimeout(() => setStage("extracting"), 800);
-            setTimeout(() => setStage("drive"), 2500);
-            setTimeout(() => setStage("sheets"), 4000);
-
-            const res = await fetch("/api/upload", {
-                method: "POST",
-                body: formData,
-            });
-
-            const data = await res.json();
-
-            if (!res.ok) {
-                throw new Error(data.error ?? "Processing failed");
+    // Warn before leaving/reloading during upload so state isn’t lost
+    useEffect(() => {
+        const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+            if (isProcessing) {
+                e.preventDefault();
             }
-
-            const newResult = data.data as InvoiceResult;
-            const updatedResults = [...currentResults, newResult];
-            setResults(updatedResults);
-            
-            // Process next file after a tiny delay
-            setTimeout(() => processNext(files, index + 1, updatedResults), 1000);
-            
-        } catch (err: any) {
-            const errorResult = { filename: file.name, error: err.message ?? "An unexpected error occurred" };
-            const updatedResults = [...currentResults, errorResult];
-            setResults(updatedResults);
-            
-            // Continue with next file even if this one failed
-            setTimeout(() => processNext(files, index + 1, updatedResults), 1000);
-        }
-    }, [session]);
-
-    const onDrop = useCallback(
-        (acceptedFiles: File[]) => {
-            if (acceptedFiles.length > 0) {
-                setQueue(acceptedFiles);
-                setResults([]);
-                setCurrentIndex(-1);
-                processNext(acceptedFiles, 0, []);
-            }
-        },
-        [processNext]
-    );
-
-    const { getRootProps, getInputProps, isDragActive } = useDropzone({
-        onDrop,
-        accept: { "application/pdf": [".pdf"] },
-        // Removed maxFiles: 1 to allow multiple
-        disabled: stage !== "idle" && stage !== "done" && stage !== "error",
-    });
-
-    const resetState = () => {
-        setStage("idle");
-        setResults([]);
-        setQueue([]);
-        setCurrentIndex(-1);
-    };
-
-    // Acknowledge batch completion: clear working state but keep results visible
-    const acknowledgeBatchComplete = () => {
-        setShowBatchComplete(false);
-        setStage("idle");
-        setQueue([]);
-        setCurrentIndex(-1);
-    };
-
-    const currentStageIndex = stageOrder.indexOf(stage);
-    const isProcessing = currentIndex >= 0 && currentIndex < queue.length;
-    const currentFile = isProcessing ? queue[currentIndex] : null;
+        };
+        window.addEventListener("beforeunload", handleBeforeUnload);
+        return () => window.removeEventListener("beforeunload", handleBeforeUnload);
+    }, [isProcessing]);
 
     return (
         <div className="max-w-4xl mx-auto w-full min-w-0">
@@ -420,7 +333,7 @@ export default function DashboardPage() {
                                             });
                                             setDriveFolderId("");
                                             setDriveFolderLabel("");
-                                            await update();
+                                            await requestSessionUpdate();
                                         } catch {
                                             // ignore
                                         }
@@ -451,9 +364,22 @@ export default function DashboardPage() {
                     </div>
                     <div className="mt-2 space-y-1">
                         {folderError && (
-                            <p className="text-xs text-red-600">
-                                {folderError}
-                            </p>
+                            <>
+                                <p className="text-xs text-red-600">
+                                    {folderError}
+                                </p>
+                                <p className="text-xs text-amber-700 mt-1">
+                                    ถ้าเห็น 403 หรือไม่มีสิทธิ์จาก Google อาจเป็นเพราะตอนล็อกอินไม่ได้กดอนุญาตสิทธิ์ Drive/Sheets — กรุณา{" "}
+                                    <button
+                                        type="button"
+                                        onClick={() => signOut({ callbackUrl: "/login" })}
+                                        className="underline font-medium hover:text-amber-900 cursor-pointer"
+                                    >
+                                        ออกจากระบบแล้วล็อกอินใหม่
+                                    </button>
+                                    {" "}แล้วกดอนุญาตทุกสิทธิ์ที่แอปขอ
+                                </p>
+                            </>
                         )}
                         <p className="text-xs text-slate-500">
                             Current target folder:&nbsp;

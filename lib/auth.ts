@@ -38,13 +38,27 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     // jwt callback runs when token is created/updated
     async jwt({ token, user, account }) {
       if (account && user) {
-        // First login — attach Google access token and user id
+        // New sign-in (first time or re-login) — save Google tokens to JWT and to DB
+        // Important: on re-login with more scopes, we must overwrite DB so API calls use the new token
         token.userId = user.id;
         token.accessToken = account.access_token;
-        token.refreshToken = account.refresh_token; 
+        token.refreshToken = account.refresh_token;
         token.expiresAt = account.expires_at ? account.expires_at * 1000 : 0;
+
+        const accountData: Record<string, unknown> = {};
+        if (account.access_token != null) accountData.access_token = account.access_token;
+        if (account.refresh_token != null) accountData.refresh_token = account.refresh_token;
+        if (account.expires_at != null) accountData.expires_at = account.expires_at;
+        const scope = (account as { scope?: string }).scope;
+        if (scope != null) accountData.scope = scope;
+        if (Object.keys(accountData).length > 0) {
+          await prisma.account.updateMany({
+            where: { userId: user.id, provider: "google" },
+            data: accountData as any,
+          });
+        }
       }
-      
+
       // On subsequent calls, fetch fresh credits, sheetId, and access_token if missing
       if (token.userId) {
         let currentAccessToken = token.accessToken as string | undefined;
@@ -52,7 +66,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
 
         const dbUser = await prisma.user.findUnique({
           where: { id: token.userId as string },
-          select: { 
+          select: {
             credits: true,
             plan: true,
             sheetId: true,
@@ -64,8 +78,8 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
             driveFolderId: true,
             accounts: {
               where: { provider: "google" },
-              select: { access_token: true, refresh_token: true, expires_at: true }
-            }
+              select: { access_token: true, refresh_token: true, expires_at: true },
+            },
           },
         });
 
@@ -79,13 +93,13 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           (token as any).sheetProfiles = dbUser.sheetProfiles;
           (token as any).activeSheetProfileId = dbUser.activeSheetProfileId;
           (token as any).driveFolderId = dbUser.driveFolderId;
-          
-          const account = dbUser.accounts[0];
-          if (account) {
-            // Update token from DB if DB has it
-            currentAccessToken = account.access_token || currentAccessToken;
-            token.refreshToken = account.refresh_token || token.refreshToken;
-            expiresAt = account.expires_at ? account.expires_at * 1000 : expiresAt;
+
+          const dbAccount = dbUser.accounts[0];
+          if (dbAccount) {
+            // Use DB tokens (now updated on re-login so they match the latest consent)
+            currentAccessToken = dbAccount.access_token || currentAccessToken;
+            token.refreshToken = dbAccount.refresh_token || token.refreshToken;
+            expiresAt = dbAccount.expires_at ? dbAccount.expires_at * 1000 : expiresAt;
           }
         }
 
