@@ -15,13 +15,13 @@ export default function AdminSidebar() {
   const pathname = usePathname();
 
   return (
-    <aside className="w-56 min-h-screen bg-slate-800 text-white flex flex-col shrink-0">
+    <aside className="w-56 h-screen sticky top-0 bg-slate-800 text-white flex flex-col shrink-0">
       <div className="px-4 py-5 border-b border-slate-700">
         <p className="font-bold text-slate-100">Files Go Admin</p>
         <p className="text-xs text-slate-400 mt-0.5">Admin panel</p>
       </div>
 
-      <nav className="flex-1 p-3 space-y-1">
+      <nav className="flex-1 p-3 space-y-1 overflow-y-auto">
         {navLinks.map(({ href, label, icon: Icon }) => {
           const isActive = pathname === href || (href !== "/admin" && pathname.startsWith(href));
           return (

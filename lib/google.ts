@@ -41,6 +41,48 @@ async function getOrCreateFolder(
     return createRes.data.id!;
 }
 
+/**
+ * For unsuccessful payments, we want a dedicated child folder under the main
+ * target folder. If someone in the team already created it manually, we reuse
+ * that folder; otherwise we create it.
+ *
+ * Example:
+ *   - Target folder:   FB_Invoices_2026-03   (or the configured Drive folder)
+ *   - Failed subfolder: FB_Invoices_2026-03 / _Unsuccessful
+ */
+async function getOrCreateFailedSubfolder(
+    drive: ReturnType<typeof google.drive>,
+    parentFolderId: string
+): Promise<string> {
+    const failedName = "_Unsuccessful";
+
+    const searchRes = await drive.files.list({
+        q: [
+            `name='${failedName}'`,
+            "mimeType='application/vnd.google-apps.folder'",
+            "trashed=false",
+            `'${parentFolderId}' in parents`,
+        ].join(" and "),
+        fields: "files(id, name)",
+        spaces: "drive",
+    });
+
+    if (searchRes.data.files && searchRes.data.files.length > 0) {
+        return searchRes.data.files[0].id!;
+    }
+
+    const createRes = await drive.files.create({
+        requestBody: {
+            name: failedName,
+            mimeType: "application/vnd.google-apps.folder",
+            parents: [parentFolderId],
+        },
+        fields: "id",
+    });
+
+    return createRes.data.id!;
+}
+
 // Define the structure of sheet mapping
 export interface SheetMapping {
     date: string;
@@ -131,9 +173,14 @@ export async function syncToGoogle(
     const sheets = google.sheets({ version: "v4", auth });
 
     // 1. Determine target Drive folder
-    const folderId = driveFolderId && driveFolderId.trim().length > 0
+    const baseFolderId = driveFolderId && driveFolderId.trim().length > 0
         ? driveFolderId
         : await getOrCreateFolder(drive, data.date);
+
+    // If this is an unsuccessful payment, use/create a dedicated "_Unsuccessful" subfolder
+    const folderId = data.paymentSuccess
+        ? baseFolderId
+        : await getOrCreateFailedSubfolder(drive, baseFolderId);
 
     // 2. Upload the PDF file
     const { Readable } = await import("stream");

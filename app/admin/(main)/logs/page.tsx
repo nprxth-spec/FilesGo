@@ -3,8 +3,17 @@ import Link from "next/link";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import LogsRangeSelect from "./LogsRangeSelect";
 import { UserFilterClient } from "./UserFilterClient";
+import { LogRowActionsClient } from "./LogRowActionsClient";
+import { LogsSearchClient } from "./LogsSearchClient";
+import { LogsPageSizeSelect } from "./LogsPageSizeSelect";
 
-const PAGE_SIZE = 50;
+const PAGE_SIZE_OPTIONS = [25, 50, 100, 200, 500] as const;
+const DEFAULT_PAGE_SIZE = 50;
+
+function parsePageSize(v: string | undefined): number {
+  const n = parseInt(v ?? "", 10);
+  return PAGE_SIZE_OPTIONS.includes(n as any) ? n : DEFAULT_PAGE_SIZE;
+}
 
 type DateRangePreset = "today" | "yesterday" | "this_week" | "this_month" | "last_month" | "this_year";
 
@@ -51,10 +60,13 @@ function getDateRange(range: DateRangePreset): { from: Date; to: Date } {
   return { from, to };
 }
 
-function buildQuery(page?: number, range?: string): string {
+function buildQuery(opts: { page?: number; range?: string; userId?: string; q?: string; limit?: number }): string {
   const q = new URLSearchParams();
-  if (page && page > 1) q.set("page", String(page));
-  if (range && range !== "all") q.set("range", range);
+  if (opts.page && opts.page > 1) q.set("page", String(opts.page));
+  if (opts.range && opts.range !== "all") q.set("range", opts.range);
+  if (opts.userId) q.set("userId", opts.userId);
+  if (opts.q) q.set("q", opts.q);
+  if (opts.limit != null && opts.limit !== DEFAULT_PAGE_SIZE) q.set("limit", String(opts.limit));
   const s = q.toString();
   return s ? `?${s}` : "";
 }
@@ -62,15 +74,17 @@ function buildQuery(page?: number, range?: string): string {
 export default async function AdminLogsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ page?: string; range?: string; userId?: string }>;
+  searchParams: Promise<{ page?: string; range?: string; userId?: string; q?: string; limit?: string }>;
 }) {
   const params = await searchParams;
   const page = Math.max(1, parseInt(params.page ?? "1", 10));
+  const pageSize = parsePageSize(params.limit);
   const range = (params.range ?? "all") as DateRangePreset | "all";
   const userId = params.userId ?? "";
-  const skip = (page - 1) * PAGE_SIZE;
+  const query = (params.q ?? "").trim();
+  const skip = (page - 1) * pageSize;
 
-  const where: { createdAt?: { gte: Date; lte: Date }; userId?: string } = {};
+  const where: any = {};
   const validPresets: DateRangePreset[] = [
     "today",
     "yesterday",
@@ -88,11 +102,27 @@ export default async function AdminLogsPage({
     where.userId = userId;
   }
 
+  if (query) {
+    where.OR = [
+      { filename: { contains: query, mode: "insensitive" } },
+      { originalFilename: { contains: query, mode: "insensitive" } },
+      { driveLink: { contains: query, mode: "insensitive" } },
+      {
+        user: {
+          OR: [
+            { email: { contains: query, mode: "insensitive" } },
+            { name: { contains: query, mode: "insensitive" } },
+          ],
+        },
+      },
+    ];
+  }
+
   const [logs, total, usersForFilter] = await Promise.all([
     prisma.processingLog.findMany({
       where,
       orderBy: { createdAt: "desc" },
-      take: PAGE_SIZE,
+      take: pageSize,
       skip,
       include: {
         user: { select: { id: true, email: true, name: true } },
@@ -106,26 +136,35 @@ export default async function AdminLogsPage({
     }),
   ]);
 
-  const totalPages = Math.ceil(total / PAGE_SIZE) || 1;
+  const totalPages = Math.ceil(total / pageSize) || 1;
   const rangeLabel =
     (range === "all" ? "All time" : range === "today" ? "Today" : range === "yesterday" ? "Yesterday" : range === "this_week" ? "This week" : range === "this_month" ? "This month" : range === "last_month" ? "Last month" : range === "this_year" ? "This year" : "All time");
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col gap-3 sm:gap-4">
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-          <h1 className="text-xl font-bold text-slate-900">ประมวลผลใบแจ้งหนี้</h1>
-          <LogsRangeSelect basePath="/admin/logs" currentRange={range} dateLabel="Date (processed):" />
+      <div className="space-y-2">
+        <div className="flex flex-col gap-2">
+          <div className="flex items-center justify-between gap-3 flex-wrap">
+            <h1 className="text-xl font-bold text-slate-900">ประมวลผลใบแจ้งหนี้</h1>
+            <div className="flex items-center gap-3 flex-wrap justify-end">
+              <LogsRangeSelect
+                basePath="/admin/logs"
+                currentRange={range}
+                dateLabel="Date (processed):"
+              />
+              <UserFilterClient
+                users={usersForFilter.map((u) => ({
+                  id: u.id,
+                  label: u.email ?? u.name ?? u.id,
+                }))}
+                currentUserId={userId || undefined}
+                basePath="/admin/logs"
+                currentRange={range}
+              />
+            </div>
+          </div>
+          <LogsSearchClient basePath="/admin/logs" />
         </div>
-        <UserFilterClient
-          users={usersForFilter.map((u) => ({
-            id: u.id,
-            label: u.email ?? u.name ?? u.id,
-          }))}
-          currentUserId={userId || undefined}
-          basePath="/admin/logs"
-          currentRange={range}
-        />
       </div>
 
       <p className="text-sm text-slate-500">{total} รายการในระยะนี้</p>
@@ -135,6 +174,7 @@ export default async function AdminLogsPage({
           <table className="min-w-full text-sm">
             <thead>
               <tr className="border-b border-slate-200 bg-slate-50">
+                <th className="text-left px-4 py-2 font-medium text-slate-600 w-12">#</th>
                 <th className="text-left px-4 py-2 font-medium text-slate-600">Processed</th>
                 <th className="text-left px-4 py-2 font-medium text-slate-600">User</th>
                 <th className="text-left px-4 py-2 font-medium text-slate-600">Filename</th>
@@ -142,11 +182,15 @@ export default async function AdminLogsPage({
                 <th className="text-left px-4 py-2 font-medium text-slate-600">Invoice Date</th>
                 <th className="text-left px-4 py-2 font-medium text-slate-600">Amount</th>
                 <th className="text-left px-4 py-2 font-medium text-slate-600">Drive</th>
+                <th className="text-left px-4 py-2 font-medium text-slate-600">Actions</th>
               </tr>
             </thead>
             <tbody>
-              {logs.map((log) => (
+              {logs.map((log, i) => (
                 <tr key={log.id} className="border-b border-slate-100">
+                  <td className="px-4 py-2 text-slate-500 tabular-nums">
+                    {(page - 1) * pageSize + i + 1}
+                  </td>
                   <td className="px-4 py-2 text-slate-600 whitespace-nowrap">
                     {new Date(log.createdAt).toLocaleString(undefined, {
                       dateStyle: "short",
@@ -188,22 +232,28 @@ export default async function AdminLogsPage({
                       "—"
                     )}
                   </td>
+                  <td className="px-4 py-2">
+                    <LogRowActionsClient logId={log.id} />
+                  </td>
                 </tr>
               ))}
             </tbody>
           </table>
         </div>
 
-        {totalPages > 1 && (
-          <div className="flex items-center justify-between px-4 py-3 border-t border-slate-100">
-            <p className="text-xs text-slate-500">
-              Page {page} of {totalPages}
-              {range !== "all" && ` · ${rangeLabel}`}
-            </p>
+        <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-3 border-t border-slate-100">
+          <p className="text-xs text-slate-500">
+            Page {page} of {totalPages}
+            {totalPages <= 1 && total > 0 && ` · ${total} items`}
+            {totalPages > 1 && ` · ${total} items`}
+            {range !== "all" && ` · ${rangeLabel}`}
+          </p>
+          <div className="flex items-center gap-4">
+            <LogsPageSizeSelect basePath="/admin/logs" currentLimit={pageSize} />
             <div className="flex gap-2">
               {page > 1 && (
                 <Link
-                  href={`/admin/logs${buildQuery(page - 1, range)}`}
+                  href={`/admin/logs${buildQuery({ page: page - 1, range, userId: userId || undefined, q: query || undefined, limit: pageSize })}`}
                   className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg border border-slate-200 text-slate-700 hover:bg-slate-50 text-sm"
                 >
                   <ChevronLeft className="w-4 h-4" /> Previous
@@ -211,7 +261,7 @@ export default async function AdminLogsPage({
               )}
               {page < totalPages && (
                 <Link
-                  href={`/admin/logs${buildQuery(page + 1, range)}`}
+                  href={`/admin/logs${buildQuery({ page: page + 1, range, userId: userId || undefined, q: query || undefined, limit: pageSize })}`}
                   className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg border border-slate-200 text-slate-700 hover:bg-slate-50 text-sm"
                 >
                   Next <ChevronRight className="w-4 h-4" />
@@ -219,7 +269,7 @@ export default async function AdminLogsPage({
               )}
             </div>
           </div>
-        )}
+        </div>
       </div>
     </div>
   );

@@ -1,6 +1,7 @@
 "use client";
 
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
+import { useTransition } from "react";
 import { Calendar, ChevronDown } from "lucide-react";
 
 const RANGE_OPTIONS: { value: string; label: string }[] = [
@@ -23,6 +24,17 @@ export default function LogsRangeSelect({
   dateLabel?: string;
 }) {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const [isPending, startTransition] = useTransition();
+
+  const handleChange = (range: string) => {
+    const params = new URLSearchParams(searchParams.toString());
+    if (range && range !== "all") params.set("range", range);
+    else params.delete("range");
+    params.set("page", "1");
+    const url = params.toString() ? `${basePath}?${params.toString()}` : basePath;
+    startTransition(() => router.push(url));
+  };
 
   return (
     <div className="flex items-center gap-2">
@@ -31,12 +43,9 @@ export default function LogsRangeSelect({
       <div className="relative">
         <select
           value={currentRange}
-          onChange={(e) => {
-            const range = e.target.value;
-            const url = range === "all" ? basePath : `${basePath}?range=${range}`;
-            router.push(url);
-          }}
-          className="appearance-none pl-3 pr-8 py-2 rounded-lg border border-slate-200 bg-white text-slate-800 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-slate-400 min-w-[140px] cursor-pointer"
+          onChange={(e) => handleChange(e.target.value)}
+          disabled={isPending}
+          className="appearance-none pl-3 pr-8 py-2 rounded-lg border border-slate-200 bg-white text-slate-800 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-slate-400 min-w-[140px] cursor-pointer disabled:opacity-50"
         >
           {RANGE_OPTIONS.map((opt) => (
             <option key={opt.value} value={opt.value}>

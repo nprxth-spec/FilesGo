@@ -54,7 +54,12 @@ export function UserFilterClient({
       }
       alert(`Deleted ${data.deleted ?? 0} logs for this user.`);
       startTransition(() => {
-        router.refresh();
+        const params = new URLSearchParams(searchParams.toString());
+        // Clear search query and reset to first page after delete
+        params.delete("q");
+        params.set("page", "1");
+        const url = params.toString() ? `${basePath}?${params.toString()}` : basePath;
+        router.push(url);
       });
     } catch (err: any) {
       alert(err?.message ?? "Failed to delete logs");
@@ -82,7 +87,7 @@ export function UserFilterClient({
         disabled={!currentUserId || isPending}
         className="inline-flex items-center justify-center px-3 py-1.5 rounded-lg border border-red-200 text-xs font-medium text-red-600 hover:bg-red-50 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
       >
-        Delete logs for user
+        {isPending ? "Deleting..." : "Delete logs for user"}
       </button>
     </div>
   );
