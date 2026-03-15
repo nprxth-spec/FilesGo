@@ -126,6 +126,60 @@ function pickBestAmountFromText(pdfText: string, baseAmount: number, currencyHin
     return best;
 }
 
+/**
+ * Heuristic check on the raw PDF text to decide if this invoice is
+ * clearly unsuccessful. This helps correct cases where the AI might
+ * mis-classify paymentSuccess.
+ *
+ * Strategy:
+ * - If we see strong failure keywords (TH/EN) → treat as failed.
+ * - If we see explicit success words but no failure keywords → treat as success.
+ * - Otherwise → return null and let the AI's paymentSuccess stand.
+ */
+function detectPaymentSuccessFromText(pdfText: string): boolean | null {
+    const text = (pdfText ?? "").toLowerCase();
+    if (!text) return null;
+
+    // Normalize some Thai characters that often get weird in OCR (optional, lightweight)
+    const norm = text.normalize("NFC");
+
+    const failedKeywords = [
+        "ไม่สำเร็จ",
+        "ไม่ส\u0e33เร็จ",
+        "ไม่ ส\u0e33เร็จ",
+        "unsuccessful",
+        "payment unsuccessful",
+        "failed payment",
+        "payment failed",
+        "declined",
+        "wasn't completed",
+        "not completed",
+    ];
+
+    for (const k of failedKeywords) {
+        if (norm.includes(k.toLowerCase())) {
+            return false;
+        }
+    }
+
+    const successKeywords = [
+        "ชำระเงินสำเร็จ",
+        "ทำรายการสำเร็จ",
+        "successful payment",
+        "payment successful",
+        "payment completed",
+        "paid",
+    ];
+
+    for (const k of successKeywords) {
+        if (norm.includes(k.toLowerCase())) {
+            return true;
+        }
+    }
+
+    return null;
+}
+
 export async function extractInvoiceData(pdfText: string): Promise<InvoiceData> {
     // Truncate to first 3000 chars — key info in Facebook PDF is always near the top
     const trimmedText = pdfText.slice(0, 3000);
@@ -158,13 +212,20 @@ ${trimmedText}`;
         const baseAmount = Number(parsed.amount) || 0;
         const finalAmount = pickBestAmountFromText(pdfText, baseAmount, parsed.currency);
 
+        // Start from model's decision, but let our text heuristic override when confident.
+        let paymentSuccess = Boolean(parsed.paymentSuccess !== false);
+        const detected = detectPaymentSuccessFromText(pdfText);
+        if (detected !== null) {
+            paymentSuccess = detected;
+        }
+
         return {
             date: parsed.date ?? "",
             card_last_4: parsed.card_last_4?.replace(/\D/g, "").slice(-4) ?? "",
             amount: finalAmount,
             currency: parsed.currency ?? "USD",
             billed_to: normalizeBilledTo(parsed.billed_to ?? ""),
-            paymentSuccess: Boolean(parsed.paymentSuccess !== false),
+            paymentSuccess,
         };
     } catch (err) {
         console.error("Gemini Extraction Error:", err);
