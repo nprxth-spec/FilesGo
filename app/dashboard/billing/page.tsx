@@ -227,7 +227,7 @@ export default function BillingCompositePage() {
                   </span>
                 </div>
                 <ul className="text-xs text-slate-600 space-y-1">
-                  <li>• 10 credits per month (resets monthly)</li>
+                  <li>• 9,999 credits per month (resets monthly)</li>
                   <li>• Basic invoice uploads</li>
                 </ul>
               </div>

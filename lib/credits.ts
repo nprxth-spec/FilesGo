@@ -1,6 +1,6 @@
 import { prisma } from "@/lib/prisma";
 
-const FREE_PLAN_CREDITS = 10;
+const FREE_PLAN_CREDITS = 9999;
 
 /**
  * If user is on free plan and we're in a new calendar month since lastCreditsReset,
