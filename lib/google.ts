@@ -45,7 +45,8 @@ async function getOrCreateFolder(
 export interface SheetMapping {
     date: string;
     card_last_4: string;
-    amount: string;
+    amount: string;        // column for successful payment amount (e.g. G)
+    amountFailed?: string; // column for unsuccessful payment amount (e.g. H), default H
     currency: string;
     filename: string;
     driveLink: string;
@@ -195,7 +196,12 @@ export async function syncToGoogle(
         writeIfMapped(mapping.date, data.date ?? "");
         writeIfMapped(mapping.billed_to, data.billed_to ?? "");
         writeIfMapped(mapping.card_last_4, data.card_last_4 ?? "");
-        writeIfMapped(mapping.amount, data.amount ?? 0);
+        // Success → column G (amount); failed → column H (amountFailed)
+        if (data.paymentSuccess) {
+            writeIfMapped(mapping.amount, data.amount ?? 0);
+        } else {
+            writeIfMapped(mapping.amountFailed ?? "H", data.amount ?? 0);
+        }
         writeIfMapped(mapping.currency, data.currency ?? "");
         writeIfMapped(mapping.filename, filename);
         writeIfMapped(mapping.driveLink, driveLink);

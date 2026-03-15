@@ -22,6 +22,7 @@ export interface InvoiceResult {
     currency: string;
     driveLink: string;
     billed_to: string;
+    paymentSuccess?: boolean;
 }
 
 type ResultItem = InvoiceResult | { filename: string; error: string };

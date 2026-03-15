@@ -8,6 +8,8 @@ export interface InvoiceData {
     amount: number;
     currency: string;
     billed_to: string;
+    /** true = payment successful (write amount to column G); false = payment failed/unsuccessful (write amount to column H). */
+    paymentSuccess: boolean;
 }
 
 // Define the exact JSON schema Gemini must return
@@ -34,8 +36,12 @@ const invoiceSchema: Schema = {
             type: SchemaType.STRING,
             description: "The name of the person or company the invoice is billed to (ใบเรียกเก็บเงินสำหรับ / Billed To). Return ONLY the name; omit any timezone prefix such as GMT+7, +12, GMT+12, etc.",
         },
+        paymentSuccess: {
+            type: SchemaType.BOOLEAN,
+            description: "True if this receipt/invoice is for a successful payment (amount was charged). False if it is for a failed/unsuccessful payment (e.g. payment declined, unpaid, or explicitly marked as failed).",
+        },
     },
-    required: ["date", "card_last_4", "amount", "currency", "billed_to"],
+    required: ["date", "card_last_4", "amount", "currency", "billed_to", "paymentSuccess"],
 };
 
 /** Strip timezone prefix (e.g. GMT+12, +7) from Billed To so we keep only the name. */
@@ -63,6 +69,7 @@ export async function extractInvoiceData(pdfText: string): Promise<InvoiceData> 
 Rules:
 - If a value is truly missing, return an empty string or 0.
 - For "billed_to": return ONLY the person or company name. If the PDF shows a timezone prefix (e.g. "GMT+12", "+7", "GMT+7") before the name, omit it and return just the name (e.g. "Yanto Rahim" not "GMT+12 Yanto Rahim").
+- For "paymentSuccess": set true if the receipt is for a successful payment (amount charged); set false if the payment failed, was declined, or is marked as unsuccessful.
 - For "amount": use ONLY the final total amount that was actually charged/paid (the amount debited from the card). This must INCLUDE VAT, tax, and any fees. If you see both a subtotal (e.g. 20.00) and a total including VAT (e.g. 20.20), you MUST return the total (20.20), not the subtotal. Prefer fields labeled "Total", "Amount paid", "Total charged", "Amount due", or the final sum after adding tax/VAT.
 
 --- RECEIPT TEXT ---
@@ -79,9 +86,10 @@ ${trimmedText}`;
             amount: Number(parsed.amount) || 0,
             currency: parsed.currency ?? "USD",
             billed_to: normalizeBilledTo(parsed.billed_to ?? ""),
+            paymentSuccess: Boolean(parsed.paymentSuccess !== false),
         };
     } catch (err) {
         console.error("Gemini Extraction Error:", err);
-        return { date: "", card_last_4: "", amount: 0, currency: "USD", billed_to: "" };
+        return { date: "", card_last_4: "", amount: 0, currency: "USD", billed_to: "", paymentSuccess: true };
     }
 }

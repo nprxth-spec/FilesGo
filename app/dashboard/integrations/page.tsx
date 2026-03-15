@@ -11,6 +11,7 @@ const defaultMapping = {
     billed_to: "B",
     card_last_4: "O",
     amount: "G",
+    amountFailed: "H",
     currency: "",
     driveLink: "J",
 };
@@ -468,7 +469,8 @@ export default function IntegrationsPage() {
                                     { label: "Invoice Date", key: "date" },
                                     { label: "Billed To", key: "billed_to" },
                                     { label: "Card (Last 4)", key: "card_last_4" },
-                                    { label: "Amount", key: "amount" },
+                                    { label: "Amount (successful)", key: "amount" },
+                                    { label: "Amount (unsuccessful)", key: "amountFailed" },
                                     { label: "Currency", key: "currency" },
                                     { label: "Drive Link", key: "driveLink" },
                                 ].map((field) => (
@@ -477,7 +479,7 @@ export default function IntegrationsPage() {
                                             {field.label}
                                         </span>
                                         <select
-                                            value={(sheetMapping as any)[field.key] || ""}
+                                            value={(sheetMapping as any)[field.key] ?? (defaultMapping as any)[field.key] ?? ""}
                                             onChange={e => updateMapping(field.key as any, e.target.value)}
                                             className="px-3 py-2 rounded-lg border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500 font-mono text-slate-700 w-full"
                                         >

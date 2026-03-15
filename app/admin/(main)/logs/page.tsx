@@ -2,6 +2,7 @@ import { prisma } from "@/lib/prisma";
 import Link from "next/link";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import LogsRangeSelect from "./LogsRangeSelect";
+import { UserFilterClient } from "./UserFilterClient";
 
 const PAGE_SIZE = 50;
 
@@ -61,14 +62,15 @@ function buildQuery(page?: number, range?: string): string {
 export default async function AdminLogsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ page?: string; range?: string }>;
+  searchParams: Promise<{ page?: string; range?: string; userId?: string }>;
 }) {
   const params = await searchParams;
   const page = Math.max(1, parseInt(params.page ?? "1", 10));
   const range = (params.range ?? "all") as DateRangePreset | "all";
+  const userId = params.userId ?? "";
   const skip = (page - 1) * PAGE_SIZE;
 
-  const where: { createdAt?: { gte: Date; lte: Date } } = {};
+  const where: { createdAt?: { gte: Date; lte: Date }; userId?: string } = {};
   const validPresets: DateRangePreset[] = [
     "today",
     "yesterday",
@@ -82,7 +84,11 @@ export default async function AdminLogsPage({
     where.createdAt = { gte: from, lte: to };
   }
 
-  const [logs, total] = await Promise.all([
+  if (userId) {
+    where.userId = userId;
+  }
+
+  const [logs, total, usersForFilter] = await Promise.all([
     prisma.processingLog.findMany({
       where,
       orderBy: { createdAt: "desc" },
@@ -93,6 +99,11 @@ export default async function AdminLogsPage({
       },
     }),
     prisma.processingLog.count({ where }),
+    prisma.user.findMany({
+      where: { logs: { some: {} } },
+      select: { id: true, email: true, name: true },
+      orderBy: { email: "asc" },
+    }),
   ]);
 
   const totalPages = Math.ceil(total / PAGE_SIZE) || 1;
@@ -101,9 +112,20 @@ export default async function AdminLogsPage({
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <h1 className="text-xl font-bold text-slate-900">ประมวลผลใบแจ้งหนี้</h1>
-        <LogsRangeSelect basePath="/admin/logs" currentRange={range} dateLabel="Date (processed):" />
+      <div className="flex flex-col gap-3 sm:gap-4">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+          <h1 className="text-xl font-bold text-slate-900">ประมวลผลใบแจ้งหนี้</h1>
+          <LogsRangeSelect basePath="/admin/logs" currentRange={range} dateLabel="Date (processed):" />
+        </div>
+        <UserFilterClient
+          users={usersForFilter.map((u) => ({
+            id: u.id,
+            label: u.email ?? u.name ?? u.id,
+          }))}
+          currentUserId={userId || undefined}
+          basePath="/admin/logs"
+          currentRange={range}
+        />
       </div>
 
       <p className="text-sm text-slate-500">{total} รายการในระยะนี้</p>
