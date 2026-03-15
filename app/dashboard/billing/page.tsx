@@ -18,6 +18,7 @@ export default function BillingCompositePage() {
   const [paymentMethods, setPaymentMethods] = useState<any[]>([]);
   const [pmError, setPmError] = useState<string | null>(null);
   const [loadingPm, setLoadingPm] = useState(false);
+  const [deletingPmId, setDeletingPmId] = useState<string | null>(null);
   const [invoices, setInvoices] = useState<any[]>([]);
   const [invError, setInvError] = useState<string | null>(null);
   const [loadingInv, setLoadingInv] = useState(false);
@@ -45,8 +46,8 @@ export default function BillingCompositePage() {
       if (!res.ok) {
         throw new Error(data?.error ?? "Failed to delete account");
       }
-      // After deleting account, force full reload (NextAuth will redirect)
-      window.location.href = "/";
+      // After deleting account, immediately sign the user out and redirect
+      window.location.href = "/api/auth/signout?callbackUrl=/";
     } catch (err: any) {
       setDeleteError(err.message ?? "Unexpected error while deleting account.");
       setDeleting(false);
@@ -148,6 +149,7 @@ export default function BillingCompositePage() {
   const handleDeletePaymentMethod = async (id: string) => {
     try {
       setPmError(null);
+      setDeletingPmId(id);
       const res = await fetch(`/api/billing/payment-methods/${id}`, {
         method: "DELETE",
       });
@@ -158,9 +160,14 @@ export default function BillingCompositePage() {
       if (selectedPaymentMethodId === id) {
         setSelectedPaymentMethodId(null);
       }
-      await loadPaymentMethods();
+      // Optimistically remove from local state so UI updates immediately
+      setPaymentMethods((prev) => prev.filter((pm) => pm.id !== id));
+      // Then refresh from server in background
+      void loadPaymentMethods();
     } catch (err: any) {
       setPmError(err.message ?? "Failed to delete payment method.");
+    } finally {
+      setDeletingPmId(null);
     }
   };
 
@@ -328,7 +335,8 @@ export default function BillingCompositePage() {
                       <button
                         type="button"
                         onClick={() => handleSetDefaultPaymentMethod(pm.id)}
-                        className="px-2 py-1 rounded-lg border border-slate-200 text-xs font-medium text-slate-700 hover:bg-slate-50 cursor-pointer"
+                        className="px-2 py-1 rounded-lg border border-slate-200 text-xs font-medium text-slate-700 hover:bg-slate-50 cursor-pointer disabled:opacity-40"
+                        disabled={deletingPmId === pm.id}
                       >
                         Set default
                       </button>
@@ -336,10 +344,10 @@ export default function BillingCompositePage() {
                     <button
                       type="button"
                       onClick={() => handleDeletePaymentMethod(pm.id)}
-                      disabled={pm.is_default}
+                      disabled={pm.is_default || deletingPmId === pm.id}
                       className="px-2 py-1 rounded-lg border border-red-100 text-xs font-medium text-red-600 hover:bg-red-50 cursor-pointer disabled:opacity-40"
                     >
-                      Remove
+                      {deletingPmId === pm.id ? "Removing..." : "Remove"}
                     </button>
                   </div>
                 </li>
