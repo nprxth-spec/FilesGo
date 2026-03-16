@@ -1,7 +1,7 @@
- "use client";
+"use client";
 
 import { useEffect, useState } from "react";
-import { useSession } from "next-auth/react";
+import { signOut, useSession } from "next-auth/react";
 import { CheckCircle2, Zap, ArrowRight } from "lucide-react";
 import { loadStripe } from "@stripe/stripe-js";
 import { CardElement, Elements, useElements, useStripe } from "@stripe/react-stripe-js";
@@ -46,8 +46,8 @@ export default function BillingCompositePage() {
       if (!res.ok) {
         throw new Error(data?.error ?? "Failed to delete account");
       }
-      // After deleting account, immediately sign the user out and redirect
-      window.location.href = "/api/auth/signout?callbackUrl=/";
+      // After deleting account, immediately sign the user out and redirect to homepage
+      await signOut({ callbackUrl: "/" });
     } catch (err: any) {
       setDeleteError(err.message ?? "Unexpected error while deleting account.");
       setDeleting(false);

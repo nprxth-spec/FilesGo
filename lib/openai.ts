@@ -165,6 +165,8 @@ function detectPaymentSuccessFromText(pdfText: string): boolean | null {
     const successKeywords = [
         "ชำระเงินสำเร็จ",
         "ทำรายการสำเร็จ",
+        "ชำระเงินแล้ว",
+        "ชำระ แล้ว",
         "successful payment",
         "payment successful",
         "payment completed",
