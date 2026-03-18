@@ -144,16 +144,33 @@ function detectPaymentSuccessFromText(pdfText: string): boolean | null {
     const norm = text.normalize("NFC");
 
     const failedKeywords = [
+        // ภาษาไทย
         "ไม่สำเร็จ",
         "ไม่ส\u0e33เร็จ",
         "ไม่ ส\u0e33เร็จ",
+        "รายการไม่สำเร็จ",
+        "ดำเนินการไม่สำเร็จ",
+        "ชำระเงินไม่ได้",
+        "ชำระเงินไม่สำเร็จ",
+        "ยกเลิกรายการ",
+        "ไม่สามารถชำระเงิน",
+        // ภาษาอังกฤษ
         "unsuccessful",
         "payment unsuccessful",
         "failed payment",
         "payment failed",
         "declined",
         "wasn't completed",
+        "was not completed",
         "not completed",
+        "transaction failed",
+        "charge failed",
+        "could not be processed",
+        "could not be completed",
+        "payment could not",
+        "insufficient funds",
+        "transaction declined",
+        "your payment did not go through",
     ];
 
     for (const k of failedKeywords) {
@@ -163,13 +180,25 @@ function detectPaymentSuccessFromText(pdfText: string): boolean | null {
     }
 
     const successKeywords = [
+        // ภาษาไทย
         "ชำระเงินสำเร็จ",
         "ทำรายการสำเร็จ",
         "ชำระเงินแล้ว",
         "ชำระ แล้ว",
+        "ดำเนินการสำเร็จ",
+        "รายการสำเร็จ",
+        "ชำระเรียบร้อย",
+        // ภาษาอังกฤษ
         "successful payment",
         "payment successful",
         "payment completed",
+        "payment received",
+        "payment has been received",
+        "thank you for your payment",
+        "transaction complete",
+        "transaction successful",
+        "charged successfully",
+        "amount charged",
         "paid",
     ];
 
@@ -183,8 +212,8 @@ function detectPaymentSuccessFromText(pdfText: string): boolean | null {
 }
 
 export async function extractInvoiceData(pdfText: string): Promise<InvoiceData> {
-    // Truncate to first 3000 chars — key info in Facebook PDF is always near the top
-    const trimmedText = pdfText.slice(0, 3000);
+    // Truncate to first 6000 chars — gives AI enough context to spot failure indicators
+    const trimmedText = pdfText.slice(0, 6000);
 
     const model = ai.getGenerativeModel({
         model: "gemini-2.0-flash", // Free tier is 1,500 requests per day!
@@ -195,13 +224,16 @@ export async function extractInvoiceData(pdfText: string): Promise<InvoiceData> 
         },
     });
 
-    const prompt = `Extract the exact payment information from this Facebook Ads billing receipt.
+    const prompt = `Extract the exact payment information from this billing receipt (e.g. Facebook Ads, Meta Ads, or similar).
 
 Rules:
 - If a value is truly missing, return an empty string or 0.
 - For "billed_to": return ONLY the person or company name. If the PDF shows a timezone prefix (e.g. "GMT+12", "+7", "GMT+7") before the name, omit it and return just the name (e.g. "Yanto Rahim" not "GMT+12 Yanto Rahim").
-- For "paymentSuccess": set true if the receipt is for a successful payment (amount charged); set false if the payment failed, was declined, or is marked as unsuccessful.
-- For "amount": use ONLY the final total amount that was actually charged/paid (the amount debited from the card). This must INCLUDE VAT, tax, and any fees. If you see both a subtotal (e.g. 20.00) and a total including VAT (e.g. 20.20), you MUST return the total (20.20), not the subtotal. Prefer fields labeled "Total", "Amount paid", "Total charged", "Amount due", or the final sum after adding tax/VAT). On Meta/Facebook Thai receipts, prefer the big US$ amount on the right (e.g. "US$2.33") instead of the smaller "ยอดรวม" subtotal line (e.g. "ยอดรวม: 2.12 USD" plus separate VAT).
+- For "paymentSuccess":
+  * Set FALSE if the document title, header, or body contains words like "Payment Unsuccessful", "Payment Failed", "ไม่สำเร็จ", "รายการไม่สำเร็จ", "Declined", "Transaction Failed", "Could not be processed", or similar failure indicators.
+  * Set TRUE if the document shows a receipt for a completed charge, contains words like "Receipt", "Paid", "Payment Successful", "ชำระเงินสำเร็จ", "Amount Charged", or an amount was actually debited.
+  * When in doubt and no explicit failure indicator is present, set TRUE.
+- For "amount": use ONLY the final total amount that was actually charged/paid (the amount debited from the card). This must INCLUDE VAT, tax, and any fees. If you see both a subtotal (e.g. 20.00) and a total including VAT (e.g. 20.20), you MUST return the total (20.20), not the subtotal. Prefer fields labeled "Total", "Amount paid", "Total charged", "Amount due", or the final sum after adding tax/VAT. On Meta/Facebook Thai receipts, prefer the big US$ amount on the right (e.g. "US$2.33") instead of the smaller "ยอดรวม" subtotal line.
 
 --- RECEIPT TEXT ---
 ${trimmedText}`;
@@ -214,12 +246,15 @@ ${trimmedText}`;
         const baseAmount = Number(parsed.amount) || 0;
         const finalAmount = pickBestAmountFromText(pdfText, baseAmount, parsed.currency);
 
-        // Payment status:
-        // - If text explicitly says "ไม่สำเร็จ"/unsuccessful → treat as failed.
-        // - Otherwise default to "successful" to avoid mixing successful bills
-        //   into the unsuccessful bucket even if the model is uncertain.
+        // Payment status — three-way logic:
+        // 1. If heuristic finds a clear keyword (true/false) → use it as override.
+        // 2. If heuristic is inconclusive (null) → trust the AI's paymentSuccess.
+        // This prevents the old bug where unclear docs always defaulted to "success".
         const detected = detectPaymentSuccessFromText(pdfText);
-        const paymentSuccess = detected === false ? false : true;
+        const paymentSuccess =
+            detected !== null
+                ? detected                          // heuristic is confident → use it
+                : (parsed.paymentSuccess ?? true);  // heuristic unsure → trust AI
 
         return {
             date: parsed.date ?? "",
