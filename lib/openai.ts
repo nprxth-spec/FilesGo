@@ -214,12 +214,12 @@ ${trimmedText}`;
         const baseAmount = Number(parsed.amount) || 0;
         const finalAmount = pickBestAmountFromText(pdfText, baseAmount, parsed.currency);
 
-        // Start from model's decision, but let our text heuristic override when confident.
-        let paymentSuccess = Boolean(parsed.paymentSuccess !== false);
+        // Payment status:
+        // - If text explicitly says "ไม่สำเร็จ"/unsuccessful → treat as failed.
+        // - Otherwise default to "successful" to avoid mixing successful bills
+        //   into the unsuccessful bucket even if the model is uncertain.
         const detected = detectPaymentSuccessFromText(pdfText);
-        if (detected !== null) {
-            paymentSuccess = detected;
-        }
+        const paymentSuccess = detected === false ? false : true;
 
         return {
             date: parsed.date ?? "",
