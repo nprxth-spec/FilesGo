@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { isAdminAuthenticated } from "@/lib/admin-auth";
 import { getValidGoogleAccessToken } from "@/lib/google-auth";
+import { prisma } from "@/lib/prisma";
 
 /** Scopes the app requests at login (must all be granted for Drive + Sheets to work). */
 const REQUIRED_SCOPES = [
@@ -8,6 +9,10 @@ const REQUIRED_SCOPES = [
   "https://www.googleapis.com/auth/drive.file",
   "https://www.googleapis.com/auth/spreadsheets",
 ];
+
+function scopesFromString(scopeStr: string | null | undefined): string[] {
+  return (scopeStr || "").split(/\s+/).filter(Boolean);
+}
 
 export async function GET(
   _request: Request,
@@ -20,42 +25,64 @@ export async function GET(
 
   const { userId } = await params;
 
+  const dbAccount = await prisma.account.findFirst({
+    where: { userId, provider: "google" },
+    select: { scope: true },
+  });
+  const grantedFromLogin = scopesFromString(dbAccount?.scope);
+  const missingFromLogin = REQUIRED_SCOPES.filter((s) => !grantedFromLogin.includes(s));
+
   const accessToken = await getValidGoogleAccessToken(userId);
   if (!accessToken) {
     return NextResponse.json({
       ok: false,
+      verification: "no_valid_token",
       error: "no_google_account",
-      message: "ไม่มีบัญชี Google หรือไม่มีโทเค็น",
+      message:
+        "ไม่มี access token ที่ใช้ได้ (หมดอายุ / refresh ล้มเหลว / ไม่มี refresh token) — ให้ผู้ใช้ล็อกอิน Google ใหม่",
       granted: [],
-      missing: [...REQUIRED_SCOPES],
+      missing: [],
+      grantedFromLogin,
+      missingFromLogin,
     });
   }
 
   try {
     const res = await fetch(
-      `https://www.googleapis.com/oauth2/v1/tokeninfo?access_token=${encodeURIComponent(accessToken)}`
+      `https://oauth2.googleapis.com/tokeninfo?access_token=${encodeURIComponent(accessToken)}`
     );
     const data = await res.json();
 
     if (!res.ok) {
       return NextResponse.json({
         ok: false,
+        verification: "tokeninfo_failed",
         error: "tokeninfo_failed",
-        message: data.error_description ?? data.error ?? "ตรวจสอบโทเค็นกับ Google ไม่ได้",
+        message:
+          (data.error_description as string) ??
+          (data.error as string) ??
+          "ตรวจสอบโทเค็นกับ Google ไม่ได้",
         granted: [],
-        missing: [...REQUIRED_SCOPES],
+        missing: [],
+        grantedFromLogin,
+        missingFromLogin,
+        hint:
+          "ข้อความเช่น Invalid Value มักหมายถึงโทเค็นหมดอายุหรือถูกเพิกถอน ไม่ได้แปลว่าสโคปหายจากบัญชีเสมอไป — ดูสโคปตอนล็อกอินล่าสุดด้านล่าง",
       });
     }
 
     const scopeStr = (data.scope as string) || "";
-    const granted = scopeStr.split(/\s+/).filter(Boolean);
+    const granted = scopesFromString(scopeStr);
     const missing = REQUIRED_SCOPES.filter((s) => !granted.includes(s));
     const okScopes = missing.length === 0;
 
     return NextResponse.json({
       ok: okScopes,
+      verification: "ok",
       granted,
       missing,
+      grantedFromLogin,
+      missingFromLogin,
       message: okScopes
         ? "สโคปครบทุกสิทธิ์ที่แอปใช้"
         : `ขาดสิทธิ์: ${missing.join(", ")}`,
@@ -63,10 +90,13 @@ export async function GET(
   } catch (err: any) {
     return NextResponse.json({
       ok: false,
+      verification: "request_failed",
       error: "request_failed",
       message: err?.message ?? "เกิดข้อผิดพลาด",
       granted: [],
-      missing: [...REQUIRED_SCOPES],
+      missing: [],
+      grantedFromLogin,
+      missingFromLogin,
     });
   }
 }

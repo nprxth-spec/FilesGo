@@ -21,13 +21,16 @@ export async function getValidGoogleAccessToken(userId: string): Promise<string 
 
   const expiresAt = account.expires_at ? account.expires_at * 1000 : 0;
   const now = Date.now();
+  const needsRefresh = !expiresAt || now >= expiresAt - FIVE_MINUTES_MS;
 
-  if (expiresAt && now < expiresAt - FIVE_MINUTES_MS) {
+  if (!needsRefresh) {
     return account.access_token;
   }
 
   const refreshToken = account.refresh_token;
-  if (!refreshToken) return account.access_token;
+  if (!refreshToken) {
+    return null;
+  }
 
   try {
     const response = await fetch("https://oauth2.googleapis.com/token", {
@@ -44,7 +47,7 @@ export async function getValidGoogleAccessToken(userId: string): Promise<string 
     const tokens = await response.json();
     if (!response.ok) {
       console.error("Google token refresh failed:", tokens);
-      return account.access_token;
+      return null;
     }
 
     const newAccessToken = tokens.access_token;
@@ -62,6 +65,6 @@ export async function getValidGoogleAccessToken(userId: string): Promise<string 
     return newAccessToken;
   } catch (err) {
     console.error("Error refreshing Google access token:", err);
-    return account.access_token;
+    return null;
   }
 }

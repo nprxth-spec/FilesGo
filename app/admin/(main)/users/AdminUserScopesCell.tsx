@@ -8,6 +8,10 @@ type ScopeResult = {
   missing: string[];
   message: string;
   error?: string;
+  verification?: string;
+  grantedFromLogin?: string[];
+  missingFromLogin?: string[];
+  hint?: string;
 };
 
 const SCOPE_LABELS: Record<string, string> = {
@@ -15,6 +19,8 @@ const SCOPE_LABELS: Record<string, string> = {
   "https://www.googleapis.com/auth/drive.file": "Drive (สร้าง/อัปโหลด)",
   "https://www.googleapis.com/auth/spreadsheets": "Google Sheets",
 };
+
+const APP_SCOPE_URLS = Object.keys(SCOPE_LABELS);
 
 function scopeLabel(url: string): string {
   return SCOPE_LABELS[url] ?? url;
@@ -36,6 +42,10 @@ export default function AdminUserScopesCell({ userId }: { userId: string }) {
         missing: data.missing ?? [],
         message: data.message ?? (data.ok ? "สโคปครบ" : "สโคปไม่ครบ"),
         error: data.error,
+        verification: data.verification,
+        grantedFromLogin: data.grantedFromLogin,
+        missingFromLogin: data.missingFromLogin,
+        hint: data.hint,
       });
     } catch {
       setResult({
@@ -64,6 +74,39 @@ export default function AdminUserScopesCell({ userId }: { userId: string }) {
         <div className="text-xs max-w-[280px]">
           {result.ok ? (
             <span className="text-emerald-600 font-medium">✓ สโคปครบ</span>
+          ) : result.verification &&
+            (result.verification === "tokeninfo_failed" ||
+              result.verification === "no_valid_token" ||
+              result.verification === "request_failed") ? (
+            <div className="text-amber-800 space-y-0.5">
+              <span className="font-medium">⚠ ตรวจโทเค็นไม่ได้</span>
+              {result.message && (
+                <p className="text-slate-600 mt-0.5">{result.message}</p>
+              )}
+              {result.hint && (
+                <p className="text-slate-500 mt-0.5">{result.hint}</p>
+              )}
+              {result.grantedFromLogin && result.grantedFromLogin.length > 0 && (
+                <div className="mt-1 text-slate-600">
+                  <span className="font-medium text-slate-700">
+                    สโคปตอนล็อกอินล่าสุด (จากฐานข้อมูล):
+                  </span>
+                  <ul className="list-disc list-inside mt-0.5">
+                    {result.grantedFromLogin
+                      .filter((s) => APP_SCOPE_URLS.includes(s))
+                      .map((s) => (
+                        <li key={s}>{scopeLabel(s)}</li>
+                      ))}
+                  </ul>
+                  {result.missingFromLogin && result.missingFromLogin.length > 0 && (
+                    <p className="text-amber-700 mt-0.5">
+                      ขาดตอนล็อกอิน:{" "}
+                      {result.missingFromLogin.map(scopeLabel).join(", ")}
+                    </p>
+                  )}
+                </div>
+              )}
+            </div>
           ) : (
             <div className="text-amber-700 space-y-0.5">
               <span className="font-medium">✗ สโคปไม่ครบ</span>

@@ -124,20 +124,26 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
               if (response.ok) {
                 currentAccessToken = tokens.access_token;
                 expiresAt = Date.now() + tokens.expires_in * 1000;
-                
+
                 // Save new token to DB
                 await prisma.account.updateMany({
                   where: { userId: token.userId as string, provider: "google" },
-                  data: { 
+                  data: {
                     access_token: currentAccessToken,
                     expires_at: Math.floor(expiresAt / 1000),
-                    ...(tokens.refresh_token && { refresh_token: tokens.refresh_token })
-                  }
+                    ...(tokens.refresh_token && { refresh_token: tokens.refresh_token }),
+                  },
                 });
+              } else {
+                console.error("Google token refresh failed:", tokens);
+                currentAccessToken = undefined;
               }
+            } else {
+              currentAccessToken = undefined;
             }
           } catch (error) {
             console.error("Error refreshing Google access token", error);
+            currentAccessToken = undefined;
           }
         }
 
